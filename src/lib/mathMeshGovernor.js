@@ -2,13 +2,21 @@
  * MathMesh Governor — JavaScript port of the Python MathMeshGovernor class.
  * Implements the multi-base logic pipeline to filter noise, prevent agent loops,
  * and enforce coordinate alignment before tokens are ever wasted.
+ *
+ * Pipeline order (cheap gates first, LLM gates last):
+ * 1. Base 2  — Noise Stripper (free, textual)
+ * 2. Base 60 — Circuit Breaker (free, action history)
+ * 3. Base 8/10 — Matrix Voting (free, modulus parity)
+ * 4. Base 12 — Semantic Dedup (LLM, catches rephrased loops)
+ * 5. Sonnet 4.6 — Safe processing (LLM, only if all gates pass)
  */
+
+import { base44 } from '@/api/base44Client';
 
 export class MathMeshGovernor {
   constructor(tokenLimit = 50000) {
     this.tokenLimit = tokenLimit;
     this.cumulativeTokens = 0;
-    // Tracks action history per agent for the Base 60 Circuit Breaker
     this.actionHistory = {};
   }
 
@@ -17,7 +25,6 @@ export class MathMeshGovernor {
    * Strips whitespace noise, returns Go/No-Go boolean and cleaned text.
    */
   base2NoiseStripper(rawInput) {
-    // Collapse all whitespace to single spaces
     const cleanedText = rawInput.replace(/\s+/g, ' ').trim();
 
     if (cleanedText.length < 3 || cleanedText.includes('SYSTEM_ERROR_LOOP')) {
@@ -59,7 +66,6 @@ export class MathMeshGovernor {
 
     this.actionHistory[agentId].push(currentAction);
 
-    // Check last 3 actions for a repetitive loop
     const history = this.actionHistory[agentId];
     if (history.length >= 3) {
       const lastThree = history.slice(-3);
@@ -76,10 +82,36 @@ export class MathMeshGovernor {
   }
 
   /**
-   * Full pipeline: runs all four rules in sequence.
+   * Rule 5 (Base 12): Semantic Deduplication.
+   * Uses Claude Sonnet 4.6 to detect rephrased loops that textual matching misses.
+   * Only called after all free gates pass — costs LLM tokens, so it's last before processing.
+   */
+  async base12SemanticDedup(agentId, currentAction) {
+    const recentActions = (this.actionHistory[agentId] || []).slice(0, -1); // exclude current
+
+    if (recentActions.length === 0) {
+      return { isDuplicate: false, reason: 'No history to compare' };
+    }
+
+    try {
+      const res = await base44.functions.invoke('semanticDedupCheck', {
+        currentAction,
+        recentActions,
+        agentId,
+      });
+      return res.data;
+    } catch (err) {
+      // Fail open: if the LLM call fails, don't block the pipeline
+      return { isDuplicate: false, reason: `Base 12: LLM check failed — ${err.message}` };
+    }
+  }
+
+  /**
+   * Full pipeline: runs all gates in sequence, cheap first, LLM last.
    * Returns a structured result with status, gate that fired, and clean data.
    */
-  runMeshPipeline(agentId, rawPayload, currentAction, votes) {
+  async runMeshPipeline(agentId, rawPayload, currentAction, votes, opts = {}) {
+    const { enableLLM = true } = opts;
     const steps = [];
 
     // Step 1: Base 2 Binary Filter
@@ -97,9 +129,10 @@ export class MathMeshGovernor {
       return {
         status: 'HALTED',
         haltedAt: 'Base 2',
-        message: 'Execution Halted: Base 2 Triad flagged payload as invalid noise.',
+        message: 'Execution Halted: Base 2 flagged payload as invalid noise.',
         steps,
-        tokensWasted: 0,
+        cleanData: '',
+        estimatedTokensSaved: 0,
       };
     }
 
@@ -120,7 +153,8 @@ export class MathMeshGovernor {
         haltedAt: 'Base 60',
         message: `System terminated by Base 60 Circuit Breaker. 0 Tokens wasted. — ${base60Result.reason}`,
         steps,
-        tokensWasted: 0,
+        cleanData: base2Result.cleanedText,
+        estimatedTokensSaved: 0,
       };
     }
 
@@ -141,8 +175,68 @@ export class MathMeshGovernor {
         haltedAt: 'Base 8/10',
         message: 'Execution Halted: Modulus Mismatch. Agents are out of alignment.',
         steps,
-        tokensWasted: 0,
+        cleanData: base2Result.cleanedText,
+        estimatedTokensSaved: 0,
       };
+    }
+
+    // Step 4: Base 12 Semantic Dedup (LLM gate — only if enabled)
+    if (enableLLM) {
+      const dedupResult = await this.base12SemanticDedup(agentId, currentAction);
+      const isDup = dedupResult.isDuplicate;
+      steps.push({
+        step: 4,
+        gate: 'Base 12 — Semantic Dedup',
+        passed: !isDup,
+        detail: isDup
+          ? `Base 12: Semantic duplicate detected — matches "${dedupResult.matchedAction || 'prior action'}". ${dedupResult.reason}`
+          : `Base 12: No semantic duplicates. ${dedupResult.reason || 'Action is novel.'}`,
+      });
+
+      if (isDup) {
+        return {
+          status: 'HALTED',
+          haltedAt: 'Base 12',
+          message: `Execution Halted: Base 12 caught a rephrased loop. Agent is repeating intent without textual match. 0 Tokens wasted on processing.`,
+          steps,
+          cleanData: base2Result.cleanedText,
+          estimatedTokensSaved: 0,
+        };
+      }
+    }
+
+    // Step 5: Sonnet 4.6 Safe Processing (only if all gates pass)
+    let llmResponse = '';
+    if (enableLLM) {
+      try {
+        const res = await base44.functions.invoke('processWithSonnet', {
+          payload: base2Result.cleanedText,
+          action: currentAction,
+          agentId,
+        });
+        llmResponse = res.data.response || '';
+        steps.push({
+          step: 5,
+          gate: 'Sonnet 4.6 — Safe Processing',
+          passed: true,
+          detail: `Processed by Claude Sonnet 4.6. Output: ${llmResponse.length} chars.`,
+        });
+      } catch (err) {
+        steps.push({
+          step: 5,
+          gate: 'Sonnet 4.6 — Safe Processing',
+          passed: false,
+          detail: `LLM processing failed: ${err.message}`,
+        });
+        return {
+          status: 'HALTED',
+          haltedAt: 'Sonnet 4.6',
+          message: `Passed all gates but LLM processing failed: ${err.message}`,
+          steps,
+          cleanData: base2Result.cleanedText,
+          estimatedTokensSaved: 0,
+        };
+      }
     }
 
     // Passed all gates
@@ -150,10 +244,12 @@ export class MathMeshGovernor {
     return {
       status: 'PASSED',
       haltedAt: null,
-      message: `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
+      message: enableLLM
+        ? `Passed all gates. Processed by Sonnet 4.6.`
+        : `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
       cleanData: base2Result.cleanedText,
+      llmResponse,
       steps,
-      tokensWasted: 0,
       estimatedTokensSaved,
     };
   }

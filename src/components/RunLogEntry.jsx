@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
 const statusConfig = {
@@ -59,6 +59,17 @@ export default function RunLogEntry({ entry, index }) {
           <div className="text-xs text-slate-400 font-mono">
             Votes: [{entry.votes?.join(', ')}]
           </div>
+          {entry.llmResponse && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <p className="text-xs font-semibold text-indigo-600 mb-1 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" />
+                Sonnet 4.6 Response
+              </p>
+              <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded p-2 border border-slate-100 max-h-40 overflow-y-auto">
+                {entry.llmResponse}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

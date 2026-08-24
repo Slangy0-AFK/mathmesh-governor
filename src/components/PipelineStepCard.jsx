@@ -4,6 +4,8 @@ const gateColors = {
   'Base 2 — Noise Stripper': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-slate-800 text-white' },
   'Base 60 — Circuit Breaker': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-amber-700 text-white' },
   'Base 8/10 — Matrix Voting': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-blue-800 text-white' },
+  'Base 12 — Semantic Dedup': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-purple-800 text-white' },
+  'Sonnet 4.6 — Safe Processing': { pass: 'bg-indigo-50 border-indigo-200', fail: 'bg-red-50 border-red-200', badge: 'bg-indigo-900 text-white' },
 };
 
 export default function PipelineStepCard({ step, gate, passed, detail, active }) {

@@ -1,0 +1,91 @@
+{
+  "name": "PipelineRun",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "The agent that submitted the payload"
+    },
+    "action": {
+      "type": "string",
+      "description": "The action the agent was attempting"
+    },
+    "raw_payload": {
+      "type": "string",
+      "description": "Original unfiltered payload text"
+    },
+    "clean_payload": {
+      "type": "string",
+      "description": "Payload after Base 2 noise stripping"
+    },
+    "votes": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "description": "Coordinate matrix votes from agents"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PASSED",
+        "HALTED"
+      ],
+      "description": "Final pipeline outcome"
+    },
+    "halted_at": {
+      "type": "string",
+      "enum": [
+        "Base 2",
+        "Base 12",
+        "Base 60",
+        "Base 8/10",
+        ""
+      ],
+      "default": "",
+      "description": "Which gate halted the pipeline, if any"
+    },
+    "halt_reason": {
+      "type": "string",
+      "default": "",
+      "description": "Why the pipeline was halted"
+    },
+    "llm_response": {
+      "type": "string",
+      "default": "",
+      "description": "The Sonnet 4.6 response if payload passed"
+    },
+    "tokens_saved_estimate": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated characters of bloat stripped before tokenization"
+    },
+    "gate_details": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "number"
+          },
+          "gate": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Per-gate verdicts for this run"
+    }
+  },
+  "required": [
+    "agent_id",
+    "action",
+    "status"
+  ]
+}

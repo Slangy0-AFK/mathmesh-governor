@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { MathMeshGovernor } from '@/lib/mathMeshGovernor';
+import { base44 } from '@/api/base44Client';
 import PipelineStepCard from '@/components/PipelineStepCard';
 import AgentStatePanel from '@/components/AgentStatePanel';
 import RunLogEntry from '@/components/RunLogEntry';
@@ -8,41 +9,42 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Loader2, Sparkles, Database } from 'lucide-react';
 
 const PRESETS = [
   {
     label: 'Test 1: Clean Pass',
     agentId: 'FactChecker_1',
-    payload: 'Clean input text data here.',
+    payload: 'Summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.',
     action: 'Fetch_Database_Record',
     votes: '10, 12, 14',
   },
   {
     label: 'Test 2: Mismatch Breakdown',
     agentId: 'Router_2',
-    payload: 'Valid payload text.',
+    payload: 'Valid payload text for routing.',
     action: 'Route_To_Web',
     votes: '8, 16, 21',
   },
   {
     label: 'Test 3: Loop Breaker ×1',
     agentId: 'Synthesizer_1',
-    payload: 'Data payload',
+    payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
   {
     label: 'Test 3: Loop Breaker ×2',
     agentId: 'Synthesizer_1',
-    payload: 'Data payload',
+    payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
   {
     label: 'Test 3: Loop Breaker ×3 (KILLS)',
     agentId: 'Synthesizer_1',
-    payload: 'Data payload',
+    payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
@@ -53,6 +55,20 @@ const PRESETS = [
     action: 'Process',
     votes: '4, 8, 12',
   },
+  {
+    label: 'Test 5: Semantic Loop (Base 12)',
+    agentId: 'Researcher_1',
+    payload: 'Search for information about climate data.',
+    action: 'Query_Web_Search',
+    votes: '6, 8, 10',
+  },
+  {
+    label: 'Test 5b: Semantic Loop (rephrased)',
+    agentId: 'Researcher_1',
+    payload: 'Search for information about climate data.',
+    action: 'Look_Up_Internet_Results',
+    votes: '6, 8, 10',
+  },
 ];
 
 export default function Home() {
@@ -61,29 +77,96 @@ export default function Home() {
   const refresh = useCallback(() => forceUpdate(n => n + 1), []);
 
   const [agentId, setAgentId] = useState('FactChecker_1');
-  const [payload, setPayload] = useState('Clean input text data here.');
+  const [payload, setPayload] = useState('Summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.');
   const [action, setAction] = useState('Fetch_Database_Record');
   const [votesRaw, setVotesRaw] = useState('10, 12, 14');
   const [lastResult, setLastResult] = useState(null);
   const [runLog, setRunLog] = useState([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [llmEnabled, setLlmEnabled] = useState(true);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+
+  // Load persisted run history on mount
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const runs = await base44.entities.PipelineRun.list('-created_date', 50);
+      setRunLog(runs.map(r => ({
+        status: r.status,
+        haltedAt: r.halted_at || null,
+        message: r.halt_reason || (r.status === 'PASSED' ? 'Passed all gates. Processed by Sonnet 4.6.' : ''),
+        agentId: r.agent_id,
+        action: r.action,
+        rawPayload: r.raw_payload,
+        votes: r.votes || [],
+        estimatedTokensSaved: r.tokens_saved_estimate || 0,
+        llmResponse: r.llm_response || '',
+        steps: r.gate_details || [],
+        timestamp: r.created_date,
+        id: r.id,
+      })));
+    } catch (err) {
+      // Entity may not be ready yet — silently start with empty log
+    }
+    setIsLoadingHistory(false);
+  };
 
   const parseVotes = (raw) => {
     return raw.split(',').map(v => parseInt(v.trim(), 10)).filter(n => !isNaN(n));
   };
 
-  const handleRun = () => {
+  const handleRun = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
     const votes = parseVotes(votesRaw);
-    const result = governorRef.current.runMeshPipeline(agentId, payload, action, votes);
-    setLastResult(result);
-    setRunLog(prev => [{
-      ...result,
-      agentId,
-      action,
-      rawPayload: payload,
-      votes,
-      timestamp: new Date().toISOString(),
-    }, ...prev]);
-    refresh();
+
+    try {
+      const result = await governorRef.current.runMeshPipeline(agentId, payload, action, votes, { enableLLM: llmEnabled });
+      setLastResult(result);
+
+      const logEntry = {
+        ...result,
+        agentId,
+        action,
+        rawPayload: payload,
+        votes,
+        timestamp: new Date().toISOString(),
+      };
+      setRunLog(prev => [logEntry, ...prev]);
+
+      // Persist to database
+      try {
+        await base44.entities.PipelineRun.create({
+          agent_id: agentId,
+          action,
+          raw_payload: payload,
+          clean_payload: result.cleanData || '',
+          votes,
+          status: result.status,
+          halted_at: result.haltedAt || '',
+          halt_reason: result.status === 'HALTED' ? result.message : '',
+          llm_response: result.llmResponse || '',
+          tokens_saved_estimate: result.estimatedTokensSaved || 0,
+          gate_details: result.steps || [],
+        });
+      } catch (persistErr) {
+        // Persistence failure shouldn't block the UI
+      }
+    } catch (err) {
+      setLastResult({
+        status: 'HALTED',
+        haltedAt: 'Runtime',
+        message: `Pipeline error: ${err.message}`,
+        steps: [],
+        estimatedTokensSaved: 0,
+      });
+    } finally {
+      setIsRunning(false);
+      refresh();
+    }
   };
 
   const handlePreset = (preset) => {
@@ -98,7 +181,7 @@ export default function Home() {
     refresh();
   };
 
-  const handleResetAll = () => {
+  const handleResetAll = async () => {
     governorRef.current.resetAll();
     setLastResult(null);
     setRunLog([]);
@@ -121,13 +204,20 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 leading-none">MathMesh Governor</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Agentic Harness · Multi-Base Token Filter</p>
+              <p className="text-xs text-slate-400 mt-0.5">Agentic Harness · Multi-Base Token Filter · Sonnet 4.6</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={handleResetAll} className="text-slate-500 border-slate-200">
-            <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-            Reset All
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className={`w-4 h-4 ${llmEnabled ? 'text-indigo-500' : 'text-slate-300'}`} />
+              <Switch checked={llmEnabled} onCheckedChange={setLlmEnabled} />
+              <span className="text-xs text-slate-500 font-medium hidden sm:inline">LLM Gates</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleResetAll} className="text-slate-500 border-slate-200">
+              <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+              Reset All
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -145,7 +235,7 @@ export default function Home() {
               <Icon className={`w-5 h-5 ${color} shrink-0`} />
               <div>
                 <p className="text-xs text-slate-400">{label}</p>
-                <p className={`text-lg font-bold ${color}`}>{value}</p>
+                <p className={`text-lg font-bold ${color}`}>{isLoadingHistory ? '…' : value}</p>
               </div>
             </div>
           ))}
@@ -184,6 +274,7 @@ export default function Home() {
                     onChange={e => setAgentId(e.target.value)}
                     placeholder="e.g. FactChecker_1"
                     className="text-sm h-9"
+                    disabled={isRunning}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -193,6 +284,7 @@ export default function Home() {
                     onChange={e => setAction(e.target.value)}
                     placeholder="e.g. Fetch_Database_Record"
                     className="text-sm h-9"
+                    disabled={isRunning}
                   />
                 </div>
               </div>
@@ -204,6 +296,7 @@ export default function Home() {
                   onChange={e => setPayload(e.target.value)}
                   placeholder="Paste your raw input payload here..."
                   className="text-sm resize-none h-24"
+                  disabled={isRunning}
                 />
               </div>
 
@@ -216,39 +309,68 @@ export default function Home() {
                   onChange={e => setVotesRaw(e.target.value)}
                   placeholder="e.g. 10, 12, 14"
                   className="text-sm h-9 font-mono"
+                  disabled={isRunning}
                 />
               </div>
 
               <Button
                 onClick={handleRun}
-                className="w-full bg-slate-900 hover:bg-slate-700 text-white h-10"
+                disabled={isRunning}
+                className="w-full bg-slate-900 hover:bg-slate-700 text-white h-10 disabled:opacity-50"
               >
-                <Play className="w-4 h-4 mr-2" />
-                Run Mesh Pipeline
+                {isRunning ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Running Pipeline...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Run Mesh Pipeline
+                  </>
+                )}
               </Button>
+              {llmEnabled && (
+                <p className="text-xs text-indigo-500 flex items-center gap-1.5 justify-center">
+                  <Sparkles className="w-3 h-3" />
+                  Base 12 + Sonnet 4.6 gates active — passed payloads will be processed by Claude.
+                </p>
+              )}
             </div>
 
             {/* Pipeline gate results */}
             <div className="bg-white rounded-xl border border-slate-100 p-5">
               <p className="text-sm font-semibold text-slate-700 mb-4">Pipeline Gate Results</p>
               <div className="space-y-3">
-                {[
-                  { step: 1, gate: 'Base 2 — Noise Stripper' },
-                  { step: 2, gate: 'Base 60 — Circuit Breaker' },
-                  { step: 3, gate: 'Base 8/10 — Matrix Voting' },
-                ].map(({ step, gate }) => {
-                  const stepData = lastResult?.steps?.find(s => s.step === step);
-                  return (
+                {lastResult && lastResult.steps && lastResult.steps.length > 0 ? (
+                  lastResult.steps.map((s) => (
+                    <PipelineStepCard
+                      key={s.step}
+                      step={s.step}
+                      gate={s.gate}
+                      passed={s.passed}
+                      detail={s.detail}
+                      active={true}
+                    />
+                  ))
+                ) : (
+                  [
+                    { step: 1, gate: 'Base 2 — Noise Stripper' },
+                    { step: 2, gate: 'Base 60 — Circuit Breaker' },
+                    { step: 3, gate: 'Base 8/10 — Matrix Voting' },
+                    ...(llmEnabled ? [{ step: 4, gate: 'Base 12 — Semantic Dedup' }] : []),
+                    ...(llmEnabled ? [{ step: 5, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                  ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
                       step={step}
                       gate={gate}
-                      passed={stepData?.passed ?? false}
-                      detail={stepData?.detail ?? ''}
-                      active={!!stepData}
+                      passed={false}
+                      detail=""
+                      active={false}
                     />
-                  );
-                })}
+                  ))
+                )}
               </div>
 
               {lastResult && (
@@ -279,12 +401,23 @@ export default function Home() {
                       ~{lastResult.estimatedTokensSaved} characters of bloat stripped before tokenization.
                     </p>
                   )}
+                  {lastResult.llmResponse && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200">
+                      <p className="text-xs font-semibold text-indigo-600 mb-1 flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" />
+                        Sonnet 4.6 Response
+                      </p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-white rounded-lg p-3 border border-emerald-100">
+                        {lastResult.llmResponse}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right column: Agent state + log */}
+          {/* Right column: Agent state + how it works */}
           <div className="lg:col-span-2 space-y-5">
 
             {/* Agent state tracker */}
@@ -317,28 +450,46 @@ export default function Home() {
                   <span className="font-semibold text-white">Base 8/10 — Matrix Voting</span>
                   <p>Coordinate alignment check. All agent votes must share the same modulus-2 parity. Any mismatch signals agents are out of sync.</p>
                 </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-indigo-300">Base 12 — Semantic Dedup</span>
+                  <p>Sonnet 4.6 checks if the current action is a rephrased duplicate of a recent one — catches loops that textual matching misses.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-indigo-300">Sonnet 4.6 — Safe Processing</span>
+                  <p>Only payloads that pass ALL gates reach Claude Sonnet 4.6 for actual processing. Every halted run saves a full LLM call.</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Run log */}
-        {runLog.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-100 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <ListOrdered className="w-4 h-4 text-slate-500" />
-              <p className="text-sm font-semibold text-slate-700">Run Log</p>
-              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full ml-auto">
-                {runLog.length} run{runLog.length !== 1 ? 's' : ''}
-              </span>
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ListOrdered className="w-4 h-4 text-slate-500" />
+            <p className="text-sm font-semibold text-slate-700">Run Log</p>
+            <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full ml-auto flex items-center gap-1.5">
+              <Database className="w-3 h-3" />
+              {runLog.length} run{runLog.length !== 1 ? 's' : ''} persisted
+            </span>
+          </div>
+          {isLoadingHistory ? (
+            <div className="flex items-center justify-center py-8 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+              Loading run history...
             </div>
+          ) : runLog.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">No runs yet. Execute the pipeline to see history here.</p>
+          ) : (
             <div className="space-y-2">
               {runLog.map((entry, i) => (
-                <RunLogEntry key={i} entry={entry} index={i} />
+                <RunLogEntry key={entry.id || i} entry={entry} index={i} />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
