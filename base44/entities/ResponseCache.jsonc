@@ -1,0 +1,36 @@
+{
+  "name": "ResponseCache",
+  "type": "object",
+  "properties": {
+    "cache_key": {
+      "type": "string",
+      "description": "Deterministic key: action + hash of compressed payload"
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "The agent that first generated this cached response"
+    },
+    "action": {
+      "type": "string",
+      "description": "The action associated with this cache entry"
+    },
+    "compressed_payload": {
+      "type": "string",
+      "description": "The compressed payload that produced this response"
+    },
+    "response": {
+      "type": "string",
+      "description": "The LLM response to serve on cache hit"
+    },
+    "hit_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many times this cache entry has been served"
+    }
+  },
+  "required": [
+    "cache_key",
+    "action",
+    "response"
+  ]
+}

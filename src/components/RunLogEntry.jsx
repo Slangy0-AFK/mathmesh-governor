@@ -34,6 +34,12 @@ export default function RunLogEntry({ entry, index }) {
                 ~{entry.estimatedTokensSaved} chars saved
               </span>
             )}
+            {entry.cacheHit && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                <Sparkles className="w-3 h-3" />
+                CACHE HIT
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5 truncate">{entry.message}</p>
         </div>

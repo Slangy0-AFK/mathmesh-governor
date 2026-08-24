@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Loader2, Sparkles, Database } from 'lucide-react';
+import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Loader2, Sparkles, Database, Zap as ZapIcon } from 'lucide-react';
 
 const PRESETS = [
   {
@@ -69,6 +69,13 @@ const PRESETS = [
     action: 'Look_Up_Internet_Results',
     votes: '6, 8, 10',
   },
+  {
+    label: 'Test 6: Cache Hit (run twice)',
+    agentId: 'CacheTest_1',
+    payload: 'Please could you kindly summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.',
+    action: 'Fetch_Database_Record',
+    votes: '10, 12, 14',
+  },
 ];
 
 export default function Home() {
@@ -103,6 +110,7 @@ export default function Home() {
         rawPayload: r.raw_payload,
         votes: r.votes || [],
         estimatedTokensSaved: r.tokens_saved_estimate || 0,
+        cacheHit: r.cache_hit || false,
         llmResponse: r.llm_response || '',
         steps: r.gate_details || [],
         timestamp: r.created_date,
@@ -144,12 +152,15 @@ export default function Home() {
           action,
           raw_payload: payload,
           clean_payload: result.cleanData || '',
+          compressed_payload: result.compressedPayload || '',
           votes,
           status: result.status,
           halted_at: result.haltedAt || '',
           halt_reason: result.status === 'HALTED' ? result.message : '',
+          cache_hit: result.cacheHit || false,
           llm_response: result.llmResponse || '',
           tokens_saved_estimate: result.estimatedTokensSaved || 0,
+          compression_saved_chars: result.compressionSaved || 0,
           gate_details: result.steps || [],
         });
       } catch (persistErr) {
@@ -191,6 +202,7 @@ export default function Home() {
   const totalRuns = runLog.length;
   const haltedRuns = runLog.filter(r => r.status === 'HALTED').length;
   const passedRuns = runLog.filter(r => r.status === 'PASSED').length;
+  const cacheHits = runLog.filter(r => r.cacheHit).length;
   const totalSaved = runLog.reduce((acc, r) => acc + (r.estimatedTokensSaved || 0), 0);
 
   return (
@@ -224,11 +236,12 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
             { label: 'Total Runs', value: totalRuns, icon: Activity, color: 'text-slate-700' },
             { label: 'Passed', value: passedRuns, icon: Zap, color: 'text-emerald-600' },
             { label: 'Halted', value: haltedRuns, icon: Shield, color: 'text-red-500' },
+            { label: 'Cache Hits', value: cacheHits, icon: ZapIcon, color: 'text-amber-600' },
             { label: 'Chars Saved', value: totalSaved.toLocaleString(), icon: FlaskConical, color: 'text-blue-600' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white rounded-xl border border-slate-100 px-4 py-3 flex items-center gap-3">
@@ -333,7 +346,7 @@ export default function Home() {
               {llmEnabled && (
                 <p className="text-xs text-indigo-500 flex items-center gap-1.5 justify-center">
                   <Sparkles className="w-3 h-3" />
-                  Base 12 + Sonnet 4.6 gates active — passed payloads will be processed by Claude.
+                  Base 12 + Cache + Sonnet 4.6 gates active — passed payloads are compressed, cache-checked, then processed by Claude.
                 </p>
               )}
             </div>
@@ -359,7 +372,10 @@ export default function Home() {
                     { step: 2, gate: 'Base 60 — Circuit Breaker' },
                     { step: 3, gate: 'Base 8/10 — Matrix Voting' },
                     ...(llmEnabled ? [{ step: 4, gate: 'Base 12 — Semantic Dedup' }] : []),
-                    ...(llmEnabled ? [{ step: 5, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                    { step: 5, gate: 'Base 3 — Prompt Compression' },
+                    ...(llmEnabled ? [{ step: 6, gate: 'Cache Check — Response Memoization' }] : []),
+                    ...(llmEnabled ? [{ step: 7, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                    ...(llmEnabled ? [{ step: 8, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
@@ -457,8 +473,23 @@ export default function Home() {
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>
+                  <span className="font-semibold text-teal-300">Base 3 — Prompt Compression</span>
+                  <p>Rule-based, deterministic, free. Strips filler words, verbose phrases, and hedges before the LLM call — cutting input tokens on every passed run, on any model.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-amber-300">Cache Check — Response Memoization</span>
+                  <p>Before calling the LLM, checks a persistent cache keyed by action + compressed-payload fingerprint. If hit, returns the stored response instantly — zero tokens spent.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
                   <span className="font-semibold text-indigo-300">Sonnet 4.6 — Safe Processing</span>
-                  <p>Only payloads that pass ALL gates reach Claude Sonnet 4.6 for actual processing. Every halted run saves a full LLM call.</p>
+                  <p>Only payloads that pass ALL gates and miss the cache reach Claude Sonnet 4.6 for actual processing. Every halted run and every cache hit saves a full LLM call.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-amber-300">Cache Store — Response Memoization</span>
+                  <p>After a successful LLM call, the response is cached for future calls with the same action + payload fingerprint. The next identical call costs zero tokens.</p>
                 </div>
               </div>
             </div>

@@ -18,6 +18,11 @@
       "type": "string",
       "description": "Payload after Base 2 noise stripping"
     },
+    "compressed_payload": {
+      "type": "string",
+      "default": "",
+      "description": "Payload after Base 3 prompt compression"
+    },
     "votes": {
       "type": "array",
       "items": {
@@ -37,9 +42,11 @@
       "type": "string",
       "enum": [
         "Base 2",
+        "Base 3",
         "Base 12",
         "Base 60",
         "Base 8/10",
+        "Sonnet 4.6",
         ""
       ],
       "default": "",
@@ -50,15 +57,25 @@
       "default": "",
       "description": "Why the pipeline was halted"
     },
+    "cache_hit": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the response was served from the memoization cache"
+    },
     "llm_response": {
       "type": "string",
       "default": "",
-      "description": "The Sonnet 4.6 response if payload passed"
+      "description": "The LLM response if payload passed (or cached response)"
     },
     "tokens_saved_estimate": {
       "type": "number",
       "default": 0,
       "description": "Estimated characters of bloat stripped before tokenization"
+    },
+    "compression_saved_chars": {
+      "type": "number",
+      "default": 0,
+      "description": "Characters removed by Base 3 prompt compression"
     },
     "gate_details": {
       "type": "array",
