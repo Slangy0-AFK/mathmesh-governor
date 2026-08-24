@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Sparkles, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 
 const statusConfig = {
@@ -65,6 +65,26 @@ export default function RunLogEntry({ entry, index }) {
           <div className="text-xs text-slate-400 font-mono">
             Votes: [{entry.votes?.join(', ')}]
           </div>
+          {entry.ragContext && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <p className="text-xs font-semibold text-cyan-600 mb-1 flex items-center gap-1.5">
+                <BookOpen className="w-3 h-3" />
+                RAG Grounding Context {entry.ragSources?.length > 0 ? `(${entry.ragSources.length} sources)` : ''}
+              </p>
+              {entry.ragSources?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {entry.ragSources.map((s, i) => (
+                    <span key={i} className="text-xs bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded">
+                      {s.title}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed bg-cyan-50/50 rounded p-2 border border-cyan-100 max-h-32 overflow-y-auto">
+                {entry.ragContext}
+              </p>
+            </div>
+          )}
           {entry.llmResponse && (
             <div className="mt-2 pt-2 border-t border-slate-100">
               <p className="text-xs font-semibold text-indigo-600 mb-1 flex items-center gap-1.5">

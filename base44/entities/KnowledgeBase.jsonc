@@ -1,0 +1,36 @@
+{
+  "name": "KnowledgeBase",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Short label for this knowledge entry"
+    },
+    "content": {
+      "type": "string",
+      "description": "The actual facts, context, or source text the LLM should ground its response in"
+    },
+    "source": {
+      "type": "string",
+      "default": "",
+      "description": "Where this knowledge came from (URL, document name, manual entry, etc.)"
+    },
+    "action_scope": {
+      "type": "string",
+      "default": "*",
+      "description": "Which action this entry is relevant to. '*' means all actions. e.g. 'Fetch_Database_Record'"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Topic tags for filtering and retrieval"
+    }
+  },
+  "required": [
+    "title",
+    "content"
+  ]
+}

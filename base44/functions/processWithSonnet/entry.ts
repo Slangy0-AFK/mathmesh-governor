@@ -7,7 +7,7 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { payload, action, agentId } = body;
+    const { payload, action, agentId, context } = body;
 
     if (!payload || typeof payload !== 'string' || payload.length < 3) {
       return Response.json({ error: 'Invalid payload' }, { status: 400 });
@@ -16,11 +16,15 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'Payload too large' }, { status: 400 });
     }
 
+    const contextBlock = context && typeof context === 'string' && context.trim().length > 0
+      ? `\n\nGROUNDING CONTEXT — use this as your source of truth. Do not state facts not supported by this context:\n${context}\n\nIf the context does not contain the answer, say "I don't have enough grounded information to answer this."`
+      : '';
+
     const prompt = `You are a precision task processor inside an agentic harness. An agent named "${agentId}" has passed all safety gates and is requesting action: "${action}".
 
 Process the following clean payload and provide a concise, accurate, structured response. Do not add filler or repetition — token efficiency is critical:
 
-${payload}`;
+${payload}${contextBlock}`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
@@ -34,6 +38,8 @@ ${payload}`;
       model: 'claude_sonnet_4_6',
       inputLength: payload.length,
       outputLength: responseText.length,
+      contextInjected: !!(context && context.trim().length > 0),
+      contextLength: context ? context.length : 0,
     });
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 });

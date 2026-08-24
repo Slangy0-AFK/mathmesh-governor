@@ -46,6 +46,7 @@
         "Base 12",
         "Base 60",
         "Base 8/10",
+        "RAG",
         "Sonnet 4.6",
         ""
       ],
@@ -61,6 +62,30 @@
       "type": "boolean",
       "default": false,
       "description": "True if the response was served from the memoization cache"
+    },
+    "rag_context": {
+      "type": "string",
+      "default": "",
+      "description": "The grounding context retrieved by the RAG gate"
+    },
+    "rag_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Knowledge base sources used to ground the response"
     },
     "llm_response": {
       "type": "string",

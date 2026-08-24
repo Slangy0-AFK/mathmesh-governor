@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import PipelineStepCard from '@/components/PipelineStepCard';
 import AgentStatePanel from '@/components/AgentStatePanel';
 import RunLogEntry from '@/components/RunLogEntry';
+import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -112,6 +113,8 @@ export default function Home() {
         estimatedTokensSaved: r.tokens_saved_estimate || 0,
         cacheHit: r.cache_hit || false,
         llmResponse: r.llm_response || '',
+        ragContext: r.rag_context || '',
+        ragSources: r.rag_sources || [],
         steps: r.gate_details || [],
         timestamp: r.created_date,
         id: r.id,
@@ -158,6 +161,8 @@ export default function Home() {
           halted_at: result.haltedAt || '',
           halt_reason: result.status === 'HALTED' ? result.message : '',
           cache_hit: result.cacheHit || false,
+          rag_context: result.ragContext || '',
+          rag_sources: result.ragSources || [],
           llm_response: result.llmResponse || '',
           tokens_saved_estimate: result.estimatedTokensSaved || 0,
           compression_saved_chars: result.compressionSaved || 0,
@@ -374,8 +379,9 @@ export default function Home() {
                     ...(llmEnabled ? [{ step: 4, gate: 'Base 12 — Semantic Dedup' }] : []),
                     { step: 5, gate: 'Base 3 — Prompt Compression' },
                     ...(llmEnabled ? [{ step: 6, gate: 'Cache Check — Response Memoization' }] : []),
-                    ...(llmEnabled ? [{ step: 7, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
-                    ...(llmEnabled ? [{ step: 8, gate: 'Cache Store — Response Memoization' }] : []),
+                    ...(llmEnabled ? [{ step: 7, gate: 'RAG — Context Retrieval' }] : []),
+                    ...(llmEnabled ? [{ step: 8, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                    ...(llmEnabled ? [{ step: 9, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
@@ -483,6 +489,11 @@ export default function Home() {
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>
+                  <span className="font-semibold text-cyan-300">RAG — Context Retrieval</span>
+                  <p>On cache miss, retrieves relevant entries from the Knowledge Base using semantic matching. The grounding context is injected into the Sonnet prompt — the model answers from facts, not memory, preventing hallucinations.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
                   <span className="font-semibold text-indigo-300">Sonnet 4.6 — Safe Processing</span>
                   <p>Only payloads that pass ALL gates and miss the cache reach Claude Sonnet 4.6 for actual processing. Every halted run and every cache hit saves a full LLM call.</p>
                 </div>
@@ -520,6 +531,11 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Knowledge Base Manager */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <KnowledgeBaseManager />
         </div>
       </div>
     </div>

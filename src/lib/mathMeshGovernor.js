@@ -309,9 +309,11 @@ export class MathMeshGovernor {
       detail: `Compressed ${base2Result.cleanedText.length} → ${compressedPayload.length} chars (${compressionSaved} chars of verbosity stripped).`,
     });
 
-    // Step 6-8: Cache check → Sonnet processing → Cache store (only if LLM enabled)
+    // Steps 6-9: Cache check → RAG retrieval → Sonnet processing → Cache store (only if LLM enabled)
     let llmResponse = '';
     let cacheHit = false;
+    let ragContext = '';
+    let ragSources = [];
 
     if (enableLLM) {
       // Step 6: Cache Check — Response Memoization (free, DB lookup)
@@ -342,35 +344,63 @@ export class MathMeshGovernor {
         step: 6,
         gate: 'Cache Check — Response Memoization',
         passed: true,
-        detail: `Cache miss — proceeding to LLM processing.`,
+        detail: `Cache miss — proceeding to RAG retrieval + LLM processing.`,
       });
 
-      // Step 7: Sonnet 4.6 Safe Processing (uses compressed payload)
+      // Step 7: RAG — Context Retrieval (grounds response in real knowledge base data)
+      try {
+        const ragRes = await base44.functions.invoke('ragRetrieve', {
+          query: compressedPayload,
+          action: currentAction,
+        });
+        ragContext = ragRes.data.context || '';
+        ragSources = ragRes.data.sources || [];
+        steps.push({
+          step: 7,
+          gate: 'RAG — Context Retrieval',
+          passed: true,
+          detail: ragContext
+            ? `Retrieved ${ragSources.length} relevant knowledge entries (${ragContext.length} chars of grounding context injected).`
+            : 'No relevant knowledge base entries found. Proceeding without grounding context.',
+        });
+      } catch (err) {
+        steps.push({
+          step: 7,
+          gate: 'RAG — Context Retrieval',
+          passed: false,
+          detail: `RAG retrieval failed: ${err.message}. Proceeding without context (fail-open).`,
+        });
+      }
+
+      // Step 8: Sonnet 4.6 Safe Processing (uses compressed payload + RAG context)
       try {
         const res = await base44.functions.invoke('processWithSonnet', {
           payload: compressedPayload,
           action: currentAction,
           agentId,
+          context: ragContext,
         });
         llmResponse = res.data.response || '';
         steps.push({
-          step: 7,
+          step: 8,
           gate: 'Sonnet 4.6 — Safe Processing',
           passed: true,
-          detail: `Processed by Claude Sonnet 4.6 (compressed input: ${compressedPayload.length} chars). Output: ${llmResponse.length} chars.`,
+          detail: ragContext
+            ? `Processed by Claude Sonnet 4.6 with RAG grounding (input: ${compressedPayload.length} chars + ${ragContext.length} chars context). Output: ${llmResponse.length} chars.`
+            : `Processed by Claude Sonnet 4.6 (compressed input: ${compressedPayload.length} chars). Output: ${llmResponse.length} chars.`,
         });
 
-        // Step 8: Cache Store — save response for future calls
+        // Step 9: Cache Store — save response for future calls
         await this.storeInCache(currentAction, compressedPayload, llmResponse, agentId);
         steps.push({
-          step: 8,
+          step: 9,
           gate: 'Cache Store — Response Memoization',
           passed: true,
           detail: `Response cached for future calls with same action + payload fingerprint.`,
         });
       } catch (err) {
         steps.push({
-          step: 7,
+          step: 8,
           gate: 'Sonnet 4.6 — Safe Processing',
           passed: false,
           detail: `LLM processing failed: ${err.message}`,
@@ -383,6 +413,8 @@ export class MathMeshGovernor {
           cleanData: base2Result.cleanedText,
           compressedPayload,
           compressionSaved,
+          ragContext,
+          ragSources,
           estimatedTokensSaved: compressionSaved,
         };
       }
@@ -394,13 +426,15 @@ export class MathMeshGovernor {
       status: 'PASSED',
       haltedAt: null,
       message: enableLLM
-        ? `Passed all gates. Processed by Sonnet 4.6.`
+        ? `Passed all gates. Processed by Sonnet 4.6${ragContext ? ' with RAG grounding.' : '.'}`
         : `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
       cleanData: base2Result.cleanedText,
       compressedPayload,
       compressionSaved,
       llmResponse,
       cacheHit,
+      ragContext,
+      ragSources,
       steps,
       estimatedTokensSaved,
     };
