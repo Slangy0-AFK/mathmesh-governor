@@ -166,7 +166,7 @@ export class MathMeshGovernor {
    * Returns cached response if found, null otherwise.
    */
   async checkCache(action, compressedPayload) {
-    const cacheKey = `${action}::${this.hashString(compressedPayload)}`;
+    const cacheKey = `${action}::${this.hashString(compressedPayload.toLowerCase())}`;
     try {
       const results = await base44.entities.ResponseCache.filter({ cache_key: cacheKey }, '-created_date', 1);
       if (results.length > 0) {
@@ -185,7 +185,7 @@ export class MathMeshGovernor {
    * Store a response in the cache for future calls.
    */
   async storeInCache(action, compressedPayload, response, agentId) {
-    const cacheKey = `${action}::${this.hashString(compressedPayload)}`;
+    const cacheKey = `${action}::${this.hashString(compressedPayload.toLowerCase())}`;
     try {
       await base44.entities.ResponseCache.create({
         cache_key: cacheKey,
