@@ -8,7 +8,10 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { payload, action, agentId, context } = body;
+    const { payload, action, agentId, context, model } = body;
+    // Universal model support: default to 'automatic' so the harness (canary +
+    // tripwire) works identically no matter which underlying model is selected.
+    const selectedModel = typeof model === 'string' && model.trim().length > 0 ? model : 'automatic';
 
     if (!payload || typeof payload !== 'string' || payload.length < 3) {
       return Response.json({ error: 'Invalid payload' }, { status: 400 });
@@ -29,14 +32,14 @@ ${payload}${contextBlock}${CANARY_PROMPT}`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
-      model: 'claude_sonnet_4_6',
+      model: selectedModel,
     });
 
     const responseText = typeof result === 'string' ? result : (result as any)?.response || JSON.stringify(result);
 
     return Response.json({
       response: responseText,
-      model: 'claude_sonnet_4_6',
+      model: selectedModel,
       inputLength: payload.length,
       outputLength: responseText.length,
       contextInjected: !!(context && context.trim().length > 0),

@@ -7,7 +7,8 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { currentAction, recentActions, agentId } = body;
+    const { currentAction, recentActions, agentId, model } = body;
+    const selectedModel = typeof model === 'string' && model.trim().length > 0 ? model : 'automatic';
 
     if (!currentAction || typeof currentAction !== 'string') {
       return Response.json({ error: 'currentAction required' }, { status: 400 });
@@ -33,7 +34,7 @@ Respond as JSON: {"isDuplicate": boolean, "matchedAction": string or null, "reas
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
-      model: 'claude_sonnet_4_6',
+      model: selectedModel,
       response_json_schema: {
         type: 'object',
         properties: {

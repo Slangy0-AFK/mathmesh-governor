@@ -7,7 +7,8 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { query, action } = body;
+    const { query, action, model } = body;
+    const selectedModel = typeof model === 'string' && model.trim().length > 0 ? model : 'automatic';
 
     if (!query || typeof query !== 'string' || query.length < 3) {
       return Response.json({ error: 'Invalid query' }, { status: 400 });
@@ -53,7 +54,7 @@ Return JSON: {"relevant_indices": [0, 2, 5]}`;
         },
         required: ['relevant_indices']
       },
-      model: 'claude_sonnet_4_6',
+      model: selectedModel,
     });
 
     const indices = (result as any)?.relevant_indices || [];
