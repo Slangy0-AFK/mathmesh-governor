@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Shield, UserCog, Skull, Snowflake, Activity, Loader2, Plus, RefreshCw, KeyRound } from 'lucide-react';
+import { Shield, UserCog, Skull, Snowflake, Activity, Loader2, Plus, RefreshCw, KeyRound, KeySquare, Copy } from 'lucide-react';
 
 const statusConfig = {
   active: { icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Active' },
@@ -23,6 +23,10 @@ export default function AgentIdentityManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [newAgentId, setNewAgentId] = useState('');
   const [newAgentRole, setNewAgentRole] = useState('reader');
+  // Holds a freshly issued key for exactly as long as the operator needs to copy it.
+  // It is never persisted here, because the server does not store it either.
+  const [issued, setIssued] = useState(null);
+  const [issuing, setIssuing] = useState('');
 
   useEffect(() => { loadAgents(); }, []);
 
@@ -45,6 +49,19 @@ export default function AgentIdentityManager() {
       setNewAgentId('');
       loadAgents();
     } catch (err) { /* fail silently */ }
+  };
+
+  const handleIssueKey = async (agent) => {
+    setIssuing(agent.agent_id);
+    setIssued(null);
+    try {
+      const res = await base44.functions.invoke('issueAgentKey', { agentId: agent.agent_id });
+      setIssued(res.data);
+      loadAgents();
+    } catch (err) {
+      setIssued({ error: err?.response?.data?.error || err.message });
+    }
+    setIssuing('');
   };
 
   const handleRoleChange = async (agent, newRole) => {
@@ -107,6 +124,38 @@ export default function AgentIdentityManager() {
         </Button>
       </div>
 
+      {/* One-time key reveal */}
+      {issued && (
+        <div className={`rounded-xl border px-4 py-3 mb-4 ${issued.error ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+          {issued.error ? (
+            <p className="text-sm text-red-700">{issued.error}</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-amber-800">
+                {issued.rotation ? 'Key rotated' : 'Key issued'} for {issued.agentId}
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5 mb-2">{issued.warning} Any previous key stopped working.</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono bg-white border border-amber-200 rounded-md px-2 py-1.5 flex-1 break-all text-slate-800">
+                  {issued.key}
+                </code>
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => navigator.clipboard?.writeText(issued.key)}
+                  className="h-8 text-xs border-amber-300 text-amber-700"
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  Copy
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setIssued(null)} className="h-8 text-xs text-amber-600">
+                  Done
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Agent list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8 text-slate-400">
@@ -132,6 +181,17 @@ export default function AgentIdentityManager() {
                       <StatusIcon className="w-3 h-3" />
                       {cfg.label}
                     </span>
+                    {agent.key_hash ? (
+                      <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                        <KeySquare className="w-3 h-3" />
+                        keyed ···{agent.key_last_four}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-amber-600 flex items-center gap-1">
+                        <KeySquare className="w-3 h-3" />
+                        no key
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     {/* Stats */}
@@ -143,6 +203,18 @@ export default function AgentIdentityManager() {
                       </span>
                     </div>
                     {/* Actions */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleIssueKey(agent)}
+                      disabled={issuing === agent.agent_id}
+                      className="h-7 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
+                    >
+                      {issuing === agent.agent_id
+                        ? <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        : <KeySquare className="w-3 h-3 mr-1" />}
+                      {agent.key_hash ? 'Rotate key' : 'Issue key'}
+                    </Button>
                     {agent.status !== 'revoked' && (
                       <Button
                         variant="outline"

@@ -46,6 +46,7 @@
         "Identity",
         "Tool Gate",
         "Rate Limit",
+        "Egress",
         "Base 2",
         "Base 3",
         "Base 10",
@@ -76,6 +77,11 @@
       ],
       "default": "",
       "description": "What the harness did to the agent as a result of this run"
+    },
+    "authenticated": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the agent proved its identity with a secret key on this run, rather than merely claiming an id"
     },
     "cache_hit": {
       "type": "boolean",
@@ -115,6 +121,11 @@
       "type": "string",
       "default": "",
       "description": "SHA-256 of the exact output text. Binds this output to the agent and session that produced it."
+    },
+    "output_signature": {
+      "type": "string",
+      "default": "",
+      "description": "HMAC-SHA256 over agent, session, action and output hash, produced server-side with a secret the client never sees. Unlike the plain hash, this proves origin rather than mere sameness."
     },
     "drift_detected": {
       "type": "boolean",

@@ -25,7 +25,15 @@ export default async function(req: Request): Promise<Response> {
     const verdict = await admitRequest(base44.asServiceRole, {
       agentId, action,
       sessionNonce: typeof body.sessionNonce === 'string' ? body.sessionNonce : '',
+      agentKey: typeof body.agentKey === 'string' ? body.agentKey : '',
     });
+
+    // Never hand the stored key hash back to a caller. It is not the key, but it is
+    // the only thing an offline guessing attack would need to check against.
+    if (verdict.agent) {
+      const { key_hash, ...safeAgent } = verdict.agent;
+      verdict.agent = safeAgent;
+    }
 
     return Response.json(verdict);
   } catch (error) {

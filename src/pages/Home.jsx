@@ -13,6 +13,8 @@ import DriftEvaluationPanel from '@/components/DriftEvaluationPanel';
 import ReviewScorecard from '@/components/ReviewScorecard';
 import OutputAttributionLookup from '@/components/OutputAttributionLookup';
 import KillSwitchPanel from '@/components/KillSwitchPanel';
+import AgentKeyPolicyPanel from '@/components/AgentKeyPolicyPanel';
+import EgressAllowlistPanel from '@/components/EgressAllowlistPanel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -96,6 +98,7 @@ export default function Home() {
   const [payload, setPayload] = useState('Summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.');
   const [action, setAction] = useState('Fetch_Database_Record');
   const [votesRaw, setVotesRaw] = useState('10, 12, 14');
+  const [agentKey, setAgentKey] = useState('');
   const [lastResult, setLastResult] = useState(null);
   const [runLog, setRunLog] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -146,7 +149,7 @@ export default function Home() {
     const votes = parseVotes(votesRaw);
 
     try {
-      const result = await governorRef.current.runMeshPipeline(agentId, payload, action, votes, { enableLLM: llmEnabled });
+      const result = await governorRef.current.runMeshPipeline(agentId, payload, action, votes, { enableLLM: llmEnabled, agentKey });
       setLastResult(result);
 
       const logEntry = {
@@ -179,6 +182,8 @@ export default function Home() {
           rag_sources: result.ragSources || [],
           llm_response: result.llmResponse || '',
           output_hash: result.outputHash || '',
+          output_signature: result.outputSignature || '',
+          authenticated: !!result.authenticated,
           enforcement: result.enforcement || '',
           tokens_saved_estimate: result.estimatedTokensSaved || 0,
           compression_saved_chars: result.compressionSaved || 0,
@@ -325,6 +330,24 @@ export default function Home() {
                     disabled={isRunning}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">
+                  Agent Key <span className="text-slate-400 font-normal">(issued in the identity registry below)</span>
+                </Label>
+                <Input
+                  type="password"
+                  value={agentKey}
+                  onChange={e => setAgentKey(e.target.value)}
+                  placeholder="mmk_..."
+                  className="text-sm h-9 font-mono"
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-slate-400">
+                  While key authentication is on, a request without the right key for this agent id is refused at
+                  Identity, before any spend.
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -532,6 +555,16 @@ export default function Home() {
         {/* Kill switch + enforcement policy */}
         <div className="bg-white rounded-xl border border-slate-100 p-5">
           <KillSwitchPanel onChange={loadHistory} />
+        </div>
+
+        {/* Identity authentication policy */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <AgentKeyPolicyPanel />
+        </div>
+
+        {/* Egress allowlist */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <EgressAllowlistPanel />
         </div>
 
         {/* Output attribution */}

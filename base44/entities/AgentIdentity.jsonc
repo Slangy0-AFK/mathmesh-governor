@@ -27,6 +27,26 @@
       "default": "active",
       "description": "Agent lifecycle status. revoked = kill switch activated (terminal until an operator reinstates), frozen = reversible hold"
     },
+    "key_hash": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 hash of this agent's secret key. The plaintext key is shown once at issue time and never stored, so a lost key must be rotated rather than recovered."
+    },
+    "key_last_four": {
+      "type": "string",
+      "default": "",
+      "description": "Last four characters of the issued key, so an operator can tell two keys apart without seeing either"
+    },
+    "key_issued_at": {
+      "type": "string",
+      "default": "",
+      "description": "ISO timestamp of the most recent key issue or rotation"
+    },
+    "key_auth_failures": {
+      "type": "number",
+      "default": 0,
+      "description": "How many requests were rejected because they presented a wrong or missing key for this identity"
+    },
     "allowed_actions": {
       "type": "array",
       "items": {

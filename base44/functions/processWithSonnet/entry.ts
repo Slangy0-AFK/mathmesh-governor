@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { selectDecoys } from '../../shared/decoys.ts';
 import { admitRequest, consumeTicket } from '../../shared/admission.ts';
+import { signOutput } from '../../shared/signing.ts';
+import { sha256Hex } from '../../shared/agentKeys.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -41,7 +43,9 @@ export default async function(req: Request): Promise<Response> {
       }
     } else {
       admissionSource = 'inline';
-      const verdict = await admitRequest(svc, { agentId, action, sessionNonce: body.sessionNonce });
+      const verdict = await admitRequest(svc, {
+        agentId, action, sessionNonce: body.sessionNonce, agentKey: body.agentKey,
+      });
       if (!verdict.admitted) {
         return Response.json({
           error: `Admission denied at ${verdict.haltedAt}: ${verdict.reason}`,
@@ -77,8 +81,25 @@ ${payload}${contextBlock}`;
 
     const responseText = typeof result === 'string' ? result : (result as any)?.response || JSON.stringify(result);
 
+    // Sign the output where it is produced. Signing on the server, at the point of
+    // generation, is what makes the signature mean anything — the client never sees
+    // the secret and cannot mint one for text the harness did not produce.
+    const sessionNonce = typeof body.sessionNonce === 'string' ? body.sessionNonce : '';
+    const outputHash = await sha256Hex(responseText);
+    const outputSignature = await signOutput({ agentId, sessionNonce, action, outputHash });
+
+    await svc.entities.AuditLog.create({
+      event_type: 'OUTPUT_SIGNED', agent_id: agentId, gate: 'Signing',
+      session_nonce: sessionNonce, action, output_hash: outputHash,
+      output_signature: outputSignature,
+      details: `Output signed (HMAC-SHA256) and bound to ${agentId} / session ${sessionNonce.slice(0, 12)} / action ${action}.`,
+      enforcement: 'none', server_enforced: true,
+    });
+
     return Response.json({
       response: responseText,
+      outputHash,
+      outputSignature,
       model: selectedModel,
       inputLength: payload.length,
       outputLength: responseText.length,

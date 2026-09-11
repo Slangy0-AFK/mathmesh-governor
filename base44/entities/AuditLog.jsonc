@@ -18,6 +18,9 @@
         "CACHE_HIT",
         "CACHE_STORE",
         "OUTPUT_ATTRIBUTED",
+        "OUTPUT_SIGNED",
+        "EGRESS_ALLOWED",
+        "EGRESS_BLOCKED",
         "DRIFT_DETECTED",
         "TRIPWIRE_PASS",
         "AGENT_REVOKED",
@@ -48,10 +51,15 @@
       "default": "",
       "description": "SHA-256 of the output text this event refers to, for attribution lookups"
     },
+    "output_signature": {
+      "type": "string",
+      "default": "",
+      "description": "HMAC-SHA256 signature over the output facts, proving this harness produced the output"
+    },
     "gate": {
       "type": "string",
       "default": "",
-      "description": "Which gate triggered this event (e.g. Admission, Base 2, Tripwire, Kill Switch)"
+      "description": "Which gate triggered this event (e.g. Admission, Egress, Base 2, Tripwire, Kill Switch)"
     },
     "action": {
       "type": "string",

@@ -1,0 +1,38 @@
+{
+  "name": "EgressAllowlist",
+  "type": "object",
+  "properties": {
+    "host": {
+      "type": "string",
+      "description": "Exact hostname an agent may reach through the egress proxy, e.g. api.example.com. No wildcards: a wildcard entry is an allowlist that stopped being one."
+    },
+    "note": {
+      "type": "string",
+      "default": "",
+      "description": "Why this host is permitted"
+    },
+    "allowed_methods": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "GET"
+      ],
+      "description": "HTTP methods permitted for this host"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Disable to block the host without losing the record"
+    },
+    "request_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many proxied requests have been allowed to this host"
+    }
+  },
+  "required": [
+    "host"
+  ]
+}

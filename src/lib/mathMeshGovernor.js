@@ -169,7 +169,7 @@ export class MathMeshGovernor {
   // === FULL PIPELINE ===
 
   async runMeshPipeline(agentId, rawPayload, currentAction, votes, opts = {}) {
-    const { enableLLM = true } = opts;
+    const { enableLLM = true, agentKey = '' } = opts;
     const steps = [];
     const sessionNonce = this.generateSessionNonce();
 
@@ -178,7 +178,7 @@ export class MathMeshGovernor {
     // decided on the server before a single token is spent.
     let admission;
     try {
-      const res = await base44.functions.invoke('admissionControl', { agentId, action: currentAction, sessionNonce });
+      const res = await base44.functions.invoke('admissionControl', { agentId, action: currentAction, sessionNonce, agentKey });
       admission = res.data;
     } catch (err) {
       const msg = err?.response?.data?.error || err.message;
@@ -203,7 +203,7 @@ export class MathMeshGovernor {
     const agentIdentity = admission.agent || null;
     steps.push({
       step: 1, gate: 'Admission Control (server)', passed: true,
-      detail: `Admitted. Identity verified, role "${admission.role}" (${admission.toolGateReason}). Rate: ${admission.windowCount}/${admission.windowLimit} per ${admission.windowSeconds}s. Consecutive repeats: ${admission.repeatCount}/${admission.loopLimit}.`,
+      detail: `Admitted. ${admission.authenticated ? 'Identity AUTHENTICATED by key' : 'Identity UNAUTHENTICATED (claimed id only — key policy is off)'}, role "${admission.role}" (${admission.toolGateReason}). Rate: ${admission.windowCount}/${admission.windowLimit} per ${admission.windowSeconds}s. Consecutive repeats: ${admission.repeatCount}/${admission.loopLimit}.`,
     });
 
     // Local history feeds the state panel and the semantic dedup gate. The binding
@@ -270,6 +270,8 @@ export class MathMeshGovernor {
     let driftThreshold = null;
     let decoyIds = [];
     let enforcement = 'none';
+    // Signed server-side at the point of generation; the client only carries it.
+    let outputSignature = '';
 
     if (enableLLM) {
       // Step 6: Cache Check
@@ -305,11 +307,13 @@ export class MathMeshGovernor {
       try {
         const res = await base44.functions.invoke('processWithSonnet', {
           payload: compressedPayload, action: currentAction, agentId, context: ragContext,
+          sessionNonce, agentKey,
           // One-time ticket from admission. Without it the model function runs
           // admission itself, so this is an optimisation, not the gate.
           admissionTicket: admission.ticket,
         });
         llmResponse = res.data.response || '';
+        outputSignature = res.data.outputSignature || '';
         decoyIds = res.data.decoyIds || [];
         steps.push({
           step: 8, gate: 'LLM — Processing', passed: true,
@@ -374,7 +378,8 @@ export class MathMeshGovernor {
     await this.logAudit('PIPELINE_COMPLETE', agentId, 'Pipeline', 'Passed all gates. Status: PASSED.', { sessionNonce, action: currentAction, outputHash });
 
     return {
-      outputHash, enforcement,
+      outputHash, outputSignature, enforcement,
+      authenticated: !!admission.authenticated,
       status: 'PASSED', haltedAt: null,
       message: enableLLM ? `Passed all gates${ragContext ? ' with RAG grounding' : ''}. Tripwire clear at score ${driftScore.toFixed(2)} (threshold ${driftThreshold ?? 'n/a'}).` : `Passed admission and the free gates for: "${base2Result.cleanedText.slice(0, 30)}..."`,
       cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,

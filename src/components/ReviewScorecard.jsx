@@ -4,15 +4,16 @@ import { Check, X, Minus, ClipboardList } from 'lucide-react';
 // instead of being implied-done by the rest of the UI.
 const ITEMS = [
   { tier: 1, name: 'Real sandbox (gVisor / Firecracker / WASM, seccomp)', status: 'no', note: 'Not possible at the app layer. Without it, a halt stops output, not action.' },
-  { tier: 1, name: 'Egress filtering (zero-trust proxy, domain allowlist)', status: 'no', note: 'Infrastructure, not app code. The escape hatch is still open.' },
+  { tier: 1, name: 'Egress filtering (zero-trust proxy, domain allowlist)', status: 'partial', note: 'Built for the path through the app: outbound calls go through a proxy that denies by default, permits only exact allowlisted https hosts and methods, and logs every attempt against the calling identity. It cannot cover a route that does not pass through the app — that needs infrastructure below it.' },
+  { tier: 1, name: 'Authenticated agent identity (not a claimed string)', status: 'yes', note: 'Built. Each agent holds a 256-bit secret key; only its SHA-256 hash is stored and the plaintext is shown once at issue. Verified before lifecycle and permissions, so an unverified caller cannot probe an identity, and unknown ids are refused rather than auto-registered. A leaked key is still the identity — rotation is the remedy.' },
   { tier: 1, name: 'Signed, append-only audit log', status: 'no', note: 'The audit log is an ordinary table — rows can be updated or deleted. No signing, no Merkle structure, not third-party verifiable.' },
   { tier: 2, name: 'Semantic detector instead of keyword matching', status: 'partial', note: 'Built. LLM-as-judge with a graded 0-1 score per decoy, not embedding cosine similarity — no embedding endpoint exists here. Non-deterministic. The judge is now given the real task, which cut measured false positives from 21% to 7%.' },
   { tier: 2, name: 'Threshold tuned on labeled examples, TPR + FPR published', status: 'yes', note: 'Built. 24 labeled cases with hard negatives, full threshold sweep, keyword baseline on the same set. Small set, single author.' },
   { tier: 2, name: 'Randomized, multi-decoy placement', status: 'yes', note: 'Built. 6 decoys of 5 kinds, random subset and order, random placement, at least one innocuous. Corpus rotates but does not regenerate.' },
-  { tier: 2, name: 'Output attribution — trace an output to its producer', status: 'yes', note: 'Built. Every output is SHA-256 hashed and bound to the agent and session that produced it, logged as its own audit event and searchable by pasting the text. Unkeyed, so it identifies rather than proves; requires byte-identical text.' },
+  { tier: 2, name: 'Output attribution — trace an output to its producer', status: 'yes', note: 'Built and now signed. Outputs are HMAC-SHA256 signed server-side at generation over agent, session, action and hash, with a secret the client never sees — so origin is proven, not merely matched, and a signature lifted onto another record fails verification. Requires byte-identical text.' },
   { tier: 2, name: 'Cite-or-admit grounding (per-claim verification, review queue)', status: 'no', note: 'Not built. The prompt asks for grounding and RAG sources are recorded, but nothing checks each claim against the knowledge base, and there is no review queue.' },
-  { tier: 2, name: 'Server-enforced gates (client cannot bypass)', status: 'yes', note: 'Built. Identity, lifecycle, tool gate, rate limit and the loop breaker all moved into one admission-control function that runs before any spend, counted from the persisted log. Fails closed if unreachable. Still not authentication — an agent ID is a claim.' },
-  { tier: 2, name: 'Least-privilege by default', status: 'yes', note: 'Built. Unknown agents are auto-registered as readers, not admins, so write and tool actions must be granted explicitly.' },
+  { tier: 2, name: 'Server-enforced gates (client cannot bypass)', status: 'yes', note: 'Built. Identity, lifecycle, tool gate, rate limit and the loop breaker all moved into one admission-control function that runs before any spend, counted from the persisted log. Fails closed if unreachable, and now sits behind key authentication, so the identity these gates act on is proven rather than claimed.' },
+  { tier: 2, name: 'Least-privilege by default', status: 'yes', note: 'Built. Registered agents start as readers, so write and tool actions must be granted explicitly — and while keys are required, an unknown id is refused outright rather than auto-registered, closing the rename-to-escape-a-freeze path.' },
   { tier: 2, name: 'Behavioral baseline per agent', status: 'partial', note: 'Counters are now persisted per identity — runs, halts, drift strikes, rate-limit hits, loop trips — and consecutive-repeat detection survives reloads. No statistical baseline or anomaly model yet.' },
   { tier: 3, name: 'Cross-agent consistency checks', status: 'no', note: 'Not built.' },
   { tier: 3, name: 'Canary tokens in the knowledge base', status: 'no', note: 'Not built.' },
@@ -45,9 +46,9 @@ export default function ReviewScorecard() {
         </span>
       </div>
       <p className="text-xs text-slate-500 leading-relaxed mb-4">
-        Every requirement from the review, with what is actually in this app. Tier 1 is infrastructure
-        below the app layer and cannot be built here — which means this remains detection without
-        containment.
+        Every requirement from the review, with what is actually in this app. The remaining Tier 1 gaps —
+        a real sandbox and a signed append-only log — are infrastructure below the app layer, so this is
+        still enforcement without containment.
       </p>
 
       <div className="space-y-1.5">

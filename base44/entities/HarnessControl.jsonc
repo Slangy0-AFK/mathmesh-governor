@@ -22,6 +22,11 @@
       "default": "",
       "description": "Email of the operator who engaged the global stop"
     },
+    "require_agent_key": {
+      "type": "boolean",
+      "default": true,
+      "description": "When true, an agent must present its secret key to be admitted, and unknown agents are refused instead of auto-registered. Turning this off reverts identity to an unauthenticated claim \u2014 every other control then only governs a cooperative agent."
+    },
     "max_runs_per_window": {
       "type": "number",
       "default": 20,

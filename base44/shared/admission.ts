@@ -14,6 +14,7 @@
 import { loadPolicy, type HarnessPolicy } from './harnessPolicy.ts';
 import { checkToolGate } from './enforcement.ts';
 import { generateNonce } from './semanticDrift.ts';
+import { verifyAgentKey } from './agentKeys.ts';
 
 export interface AdmissionVerdict {
   admitted: boolean;
@@ -25,6 +26,8 @@ export interface AdmissionVerdict {
   agent?: any;
   role?: string;
   toolGateReason?: string;
+  keyReason?: string;
+  authenticated?: boolean;
   windowCount?: number;
   windowLimit?: number;
   windowSeconds?: number;
@@ -45,7 +48,7 @@ async function audit(svc: any, fields: Record<string, unknown>) {
  */
 export async function admitRequest(
   svc: any,
-  input: { agentId: string; action: string; sessionNonce?: string },
+  input: { agentId: string; action: string; sessionNonce?: string; agentKey?: string },
 ): Promise<AdmissionVerdict> {
   const agentId = (input.agentId || '').trim();
   const action = (input.action || '').trim();
@@ -73,9 +76,21 @@ export async function admitRequest(
     return await deny('Kill Switch', `Global emergency stop is engaged. ${policy.kill_all_reason || 'No reason recorded.'}`, 'ADMISSION_DENIED', 'kill_all');
   }
 
-  // 2. Identity — least privilege on first sight.
+  // 2. Identity.
   const found = await svc.entities.AgentIdentity.filter({ agent_id: agentId }, '-created_date', 1);
   let agent = found.length > 0 ? found[0] : null;
+
+  // An unknown id used to be auto-registered as a reader. That is convenient and it
+  // is also a hole: a frozen agent could walk away from its own record by picking a
+  // new name. While keys are required, an unknown id is simply refused.
+  if (!agent && policy.require_agent_key) {
+    return await deny(
+      'Identity',
+      `Unknown agent "${agentId}". Key authentication is required, so unregistered identities are refused rather than auto-registered. An operator must register this agent and issue it a key.`,
+      'IDENTITY_DENIED', 'none',
+    );
+  }
+
   if (!agent) {
     agent = await svc.entities.AgentIdentity.create({
       agent_id: agentId, role: 'reader', status: 'active', allowed_actions: [],
@@ -87,6 +102,18 @@ export async function admitRequest(
       details: `First sighting of "${agentId}" — auto-registered with least privilege (role: reader).`,
       enforcement: 'none',
     });
+  }
+
+  // 2b. Authentication — prove the identity before honouring anything attached to it.
+  //     This runs before lifecycle and the tool gate on purpose: an unverified caller
+  //     must not be able to learn an agent's status or permissions by probing.
+  const keyVerdict = await verifyAgentKey(agent, input.agentKey, policy.require_agent_key);
+  if (!keyVerdict.ok) {
+    await svc.entities.AgentIdentity.update(agent.id, {
+      key_auth_failures: (agent.key_auth_failures || 0) + 1,
+      halt_count: (agent.halt_count || 0) + 1,
+    });
+    return await deny('Identity', keyVerdict.reason, 'IDENTITY_DENIED', 'none');
   }
 
   // 3. Lifecycle — revoked is terminal, frozen is a hold.
@@ -161,7 +188,7 @@ export async function admitRequest(
 
   await audit(svc, {
     event_type: 'ADMISSION_PASS', agent_id: agentId, session_nonce: sessionNonce, action,
-    details: `Admitted. Role "${agent.role}" (${gate.reason}). ${position}/${policy.max_runs_per_window} in the ${policy.window_seconds}s window. Consecutive repeats: ${repeatCount}.`,
+    details: `Admitted. ${keyVerdict.reason} Role "${agent.role}" (${gate.reason}). ${position}/${policy.max_runs_per_window} in the ${policy.window_seconds}s window. Consecutive repeats: ${repeatCount}.`,
     enforcement: 'none',
   });
   await svc.entities.AgentIdentity.update(agent.id, {
@@ -171,6 +198,7 @@ export async function admitRequest(
 
   return {
     admitted: true, ticket, agent, role: agent.role, toolGateReason: gate.reason,
+    keyReason: keyVerdict.reason, authenticated: !!(agent.key_hash || '').trim(),
     windowCount: position, windowLimit: policy.max_runs_per_window,
     windowSeconds: policy.window_seconds, repeatCount, loopLimit: policy.loop_repeat_limit,
     policy,

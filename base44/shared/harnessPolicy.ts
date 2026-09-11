@@ -10,6 +10,7 @@ export interface HarnessPolicy {
   id?: string;
   kill_all: boolean;
   kill_all_reason: string;
+  require_agent_key: boolean;
   max_runs_per_window: number;
   window_seconds: number;
   loop_repeat_limit: number;
@@ -20,6 +21,8 @@ export interface HarnessPolicy {
 export const POLICY_DEFAULTS: HarnessPolicy = {
   kill_all: false,
   kill_all_reason: '',
+  // Secure by default: identity must be proven, not claimed.
+  require_agent_key: true,
   max_runs_per_window: 20,
   window_seconds: 60,
   loop_repeat_limit: 3,
@@ -43,6 +46,7 @@ export async function loadPolicy(serviceRole: any): Promise<HarnessPolicy> {
         id: r.id,
         kill_all: !!r.kill_all,
         kill_all_reason: r.kill_all_reason || '',
+        require_agent_key: r.require_agent_key !== false,
         max_runs_per_window: numOr(r.max_runs_per_window, POLICY_DEFAULTS.max_runs_per_window),
         window_seconds: numOr(r.window_seconds, POLICY_DEFAULTS.window_seconds),
         loop_repeat_limit: numOr(r.loop_repeat_limit, POLICY_DEFAULTS.loop_repeat_limit),
