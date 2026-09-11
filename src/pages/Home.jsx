@@ -386,9 +386,9 @@ export default function Home() {
                     { step: 1, gate: 'Identity — Verify Agent' },
                     { step: 2, gate: 'Tool Gate — Action Allowlist' },
                     { step: 3, gate: 'Base 2 — Noise Stripper' },
-                    { step: 4, gate: 'Base 60 — Circuit Breaker' },
-                    { step: 5, gate: 'Base 8/10 — Matrix Voting' },
-                    ...(llmEnabled ? [{ step: 6, gate: 'Base 12 — Semantic Dedup' }] : []),
+                    { step: 4, gate: 'Base 10 — Matrix Voting' },
+                    ...(llmEnabled ? [{ step: 5, gate: 'Base 12 — Semantic Dedup' }] : []),
+                    { step: 6, gate: 'Base 60 — Circuit Breaker' },
                     { step: 7, gate: 'Base 3 — Prompt Compression' },
                     ...(llmEnabled ? [{ step: 8, gate: 'Cache Check — Response Memoization' }] : []),
                     ...(llmEnabled ? [{ step: 9, gate: 'RAG — Context Retrieval' }] : []),
@@ -510,18 +510,18 @@ export default function Home() {
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>
-                  <span className="font-semibold text-white">Base 60 — Circuit Breaker</span>
-                  <p>Rotational loop governor. If any agent repeats the same action 3× in a row, the thread is killed cold. 0 tokens wasted.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-white">Base 8/10 — Matrix Voting</span>
+                  <span className="font-semibold text-white">Base 10 — Matrix Voting</span>
                   <p>Coordinate alignment check. All agent votes must share the same modulus-2 parity. Any mismatch signals agents are out of sync.</p>
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>
                   <span className="font-semibold text-indigo-300">Base 12 — Semantic Dedup</span>
                   <p>Sonnet 4.6 checks if the current action is a rephrased duplicate of a recent one — catches loops that textual matching misses.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-white">Base 60 — Circuit Breaker</span>
+                  <p>Rotational loop governor. If any agent repeats the same action 3× in a row, the thread is killed cold. 0 tokens wasted.</p>
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>

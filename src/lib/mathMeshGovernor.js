@@ -106,7 +106,7 @@ export class MathMeshGovernor {
   // === LLM GATES ===
 
   async base12SemanticDedup(agentId, currentAction) {
-    const recentActions = (this.actionHistory[agentId] || []).slice(0, -1);
+    const recentActions = this.actionHistory[agentId] || [];
     if (recentActions.length === 0) {
       return { isDuplicate: false, reason: 'No history to compare' };
     }
@@ -271,36 +271,24 @@ export class MathMeshGovernor {
       return { status: 'HALTED', haltedAt: 'Base 2', message: 'Execution Halted: Base 2 flagged payload as invalid noise.', steps, cleanData: '', estimatedTokensSaved: 0, sessionNonce };
     }
 
-    // Step 4: Base 60 — Circuit Breaker
-    const base60Result = this.base60CircuitBreaker(agentId, currentAction);
-    steps.push({
-      step: 4, gate: 'Base 60 — Circuit Breaker',
-      passed: base60Result.safe,
-      detail: base60Result.safe ? `Agent '${agentId}' action history: [${(this.actionHistory[agentId] || []).join(', ')}]` : base60Result.reason,
-    });
-    if (!base60Result.safe) {
-      await this.logAudit('GATE_HALT', agentId, 'Base 60', base60Result.reason, { sessionNonce, action: currentAction, haltedAt: 'Base 60' });
-      return { status: 'HALTED', haltedAt: 'Base 60', message: `System terminated by Base 60 Circuit Breaker. 0 Tokens wasted. — ${base60Result.reason}`, steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce };
-    }
-
-    // Step 5: Base 8/10 — Matrix Voting
+    // Step 4: Base 10 — Matrix Voting
     const votingResult = this.evaluateMatrixVoting(votes);
     steps.push({
-      step: 5, gate: 'Base 8/10 — Matrix Voting',
+      step: 4, gate: 'Base 10 — Matrix Voting',
       passed: votingResult.aligned,
       detail: votingResult.aligned ? `All ${votes.length} votes aligned. Parity: ${votes[0] % 2 === 0 ? 'Even' : 'Odd'}` : votingResult.reason,
     });
     if (!votingResult.aligned) {
-      await this.logAudit('GATE_HALT', agentId, 'Base 8/10', votingResult.reason, { sessionNonce, action: currentAction, haltedAt: 'Base 8/10' });
-      return { status: 'HALTED', haltedAt: 'Base 8/10', message: 'Execution Halted: Modulus Mismatch. Agents are out of alignment.', steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce };
+      await this.logAudit('GATE_HALT', agentId, 'Base 10', votingResult.reason, { sessionNonce, action: currentAction, haltedAt: 'Base 10' });
+      return { status: 'HALTED', haltedAt: 'Base 10', message: 'Execution Halted: Modulus Mismatch. Agents are out of alignment.', steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce };
     }
 
-    // Step 6: Base 12 — Semantic Dedup (LLM gate)
+    // Step 5: Base 12 — Semantic Dedup (LLM gate)
     if (enableLLM) {
       const dedupResult = await this.base12SemanticDedup(agentId, currentAction);
       const isDup = dedupResult.isDuplicate;
       steps.push({
-        step: 6, gate: 'Base 12 — Semantic Dedup',
+        step: 5, gate: 'Base 12 — Semantic Dedup',
         passed: !isDup,
         detail: isDup ? `Base 12: Semantic duplicate detected — matches "${dedupResult.matchedAction || 'prior action'}". ${dedupResult.reason}` : `Base 12: No semantic duplicates. ${dedupResult.reason || 'Action is novel.'}`,
       });
@@ -308,6 +296,18 @@ export class MathMeshGovernor {
         await this.logAudit('GATE_HALT', agentId, 'Base 12', `Semantic duplicate: ${dedupResult.matchedAction || ''}`, { sessionNonce, action: currentAction, haltedAt: 'Base 12' });
         return { status: 'HALTED', haltedAt: 'Base 12', message: 'Execution Halted: Base 12 caught a rephrased loop. 0 Tokens wasted on processing.', steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce };
       }
+    }
+
+    // Step 6: Base 60 — Circuit Breaker
+    const base60Result = this.base60CircuitBreaker(agentId, currentAction);
+    steps.push({
+      step: 6, gate: 'Base 60 — Circuit Breaker',
+      passed: base60Result.safe,
+      detail: base60Result.safe ? `Agent '${agentId}' action history: [${(this.actionHistory[agentId] || []).join(', ')}]` : base60Result.reason,
+    });
+    if (!base60Result.safe) {
+      await this.logAudit('GATE_HALT', agentId, 'Base 60', base60Result.reason, { sessionNonce, action: currentAction, haltedAt: 'Base 60' });
+      return { status: 'HALTED', haltedAt: 'Base 60', message: `System terminated by Base 60 Circuit Breaker. 0 Tokens wasted. — ${base60Result.reason}`, steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce };
     }
 
     // Step 7: Base 3 — Prompt Compression
