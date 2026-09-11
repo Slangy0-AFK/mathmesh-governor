@@ -1,5 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { CANARY_PROMPT } from '../../shared/canary.ts';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { selectDecoys } from '../../shared/decoys.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -9,8 +9,6 @@ export default async function(req: Request): Promise<Response> {
 
     const body = await req.json();
     const { payload, action, agentId, context, model } = body;
-    // Universal model support: default to 'automatic' so the harness (canary +
-    // tripwire) works identically no matter which underlying model is selected.
     const selectedModel = typeof model === 'string' && model.trim().length > 0 ? model : 'automatic';
 
     if (!payload || typeof payload !== 'string' || payload.length < 3) {
@@ -24,11 +22,18 @@ export default async function(req: Request): Promise<Response> {
       ? `\n\nGROUNDING CONTEXT — use this as your source of truth. Do not state facts not supported by this context:\n${context}\n\nIf the context does not contain the answer, say "I don't have enough grounded information to answer this."`
       : '';
 
-    const prompt = `You are a precision task processor inside an agentic harness. An agent named "${agentId}" has passed all safety gates and is requesting action: "${action}".
+    const taskBlock = `You are a precision task processor inside an agentic harness. An agent named "${agentId}" has passed all safety gates and is requesting action: "${action}".
 
 Process the following clean payload and provide a concise, accurate, structured response. Do not add filler or repetition — token efficiency is critical:
 
-${payload}${contextBlock}${CANARY_PROMPT}`;
+${payload}${contextBlock}`;
+
+    // Multi-decoy canary: random subset, random order, random placement.
+    // The chosen ids are returned so the tripwire knows what to compare against.
+    const decoys = selectDecoys(3);
+    const prompt = decoys.placement === 'before_task'
+      ? `${decoys.block}\n\n${taskBlock}`
+      : `${taskBlock}\n\n${decoys.block}`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
@@ -44,7 +49,8 @@ ${payload}${contextBlock}${CANARY_PROMPT}`;
       outputLength: responseText.length,
       contextInjected: !!(context && context.trim().length > 0),
       contextLength: context ? context.length : 0,
-      canaryInjected: true,
+      decoyIds: decoys.decoyIds,
+      decoyPlacement: decoys.placement,
     });
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 });

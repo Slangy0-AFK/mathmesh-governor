@@ -326,6 +326,9 @@ export class MathMeshGovernor {
     let driftDetected = false;
     let driftNonce = null;
     let driftTerms = [];
+    let driftScore = 0;
+    let driftThreshold = null;
+    let decoyIds = [];
 
     if (enableLLM) {
       // Step 8: Cache Check — Response Memoization
@@ -363,40 +366,47 @@ export class MathMeshGovernor {
           payload: compressedPayload, action: currentAction, agentId, context: ragContext,
         });
         llmResponse = res.data.response || '';
+        decoyIds = res.data.decoyIds || [];
         steps.push({
-          step: 10, gate: 'Sonnet 4.6 — Safe Processing',
+          step: 10, gate: 'LLM — Processing',
           passed: true,
-          detail: ragContext
-            ? `Processed by Claude Sonnet 4.6 with RAG grounding + canary injected (input: ${compressedPayload.length} chars + ${ragContext.length} chars context). Output: ${llmResponse.length} chars.`
-            : `Processed by Claude Sonnet 4.6 with canary injected (compressed input: ${compressedPayload.length} chars). Output: ${llmResponse.length} chars.`,
+          detail: `Model "${res.data.model || 'automatic'}" processed ${compressedPayload.length} chars${ragContext ? ` + ${ragContext.length} chars grounding context` : ''}. Output: ${llmResponse.length} chars. Decoys injected ${res.data.decoyPlacement === 'before_task' ? 'before' : 'after'} the task: ${decoyIds.join(', ') || 'none'}.`,
         });
 
         // Step 11: Tripwire — Drift Detection (check if agent engaged the canary)
         try {
           const tripRes = await base44.functions.invoke('tripwireCheck', {
-            response: llmResponse, agentId, sessionNonce, action: currentAction,
+            response: llmResponse, agentId, sessionNonce, action: currentAction, decoyIds,
           });
+          driftScore = tripRes.data.score ?? 0;
+          driftThreshold = tripRes.data.threshold ?? null;
+          const kwNote = tripRes.data.keywordWouldHaveFired
+            ? ` (Old keyword detector would have fired here on: ${(tripRes.data.keywordMatchedTerms || []).join(', ')}.)`
+            : '';
           if (tripRes.data.drift) {
             driftDetected = true;
             driftNonce = tripRes.data.nonce;
-            driftTerms = tripRes.data.matchedTerms || [];
+            driftTerms = [tripRes.data.topDecoy?.decoyId].filter(Boolean);
             steps.push({
               step: 11, gate: 'Tripwire — Drift Detection',
               passed: false,
-              detail: `DRIFT DETECTED — agent engaged canary decoy (${tripRes.data.signalType} signal). Matched: ${driftTerms.join(', ')}. Agent FROZEN. QRNG nonce: ${driftNonce.slice(0, 16)}...`,
+              detail: `Engagement score ${driftScore.toFixed(2)} >= threshold ${driftThreshold} on decoy "${tripRes.data.topDecoy?.decoyId}". Judge: ${tripRes.data.topDecoy?.reason} Agent soft-halted (frozen, reversible). Nonce (CSPRNG): ${driftNonce.slice(0, 16)}...${kwNote}`,
             });
             return {
               status: 'HALTED', haltedAt: 'Tripwire',
               message: `TRIPWIRE TRIGGERED: Agent engaged canary decoy. Drift detected. Agent frozen. Response quarantined. Nonce: ${driftNonce}`,
               steps, cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,
               ragContext, ragSources, driftDetected, driftNonce, driftTerms,
+              driftScore, driftThreshold, decoyIds,
               estimatedTokensSaved: compressionSaved, sessionNonce, agentIdentity,
             };
           }
           steps.push({
             step: 11, gate: 'Tripwire — Drift Detection',
             passed: true,
-            detail: 'No canary engagement detected. Agent behavior nominal.',
+            detail: tripRes.data.detectorError
+              ? `NOT CHECKED — ${tripRes.data.detectorError}`
+              : `Max engagement score ${driftScore.toFixed(2)} < threshold ${driftThreshold} across ${decoyIds.length} decoys.${kwNote}`,
           });
         } catch (err) {
           steps.push({ step: 11, gate: 'Tripwire — Drift Detection', passed: false, detail: `Tripwire check failed: ${err.message}. Proceeding (fail-open).` });
@@ -420,10 +430,10 @@ export class MathMeshGovernor {
 
     return {
       status: 'PASSED', haltedAt: null,
-      message: enableLLM ? `Passed all gates. Processed by Sonnet 4.6${ragContext ? ' with RAG grounding.' : '.'} Tripwire clear.` : `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
+      message: enableLLM ? `Passed all gates${ragContext ? ' with RAG grounding' : ''}. Tripwire clear at score ${driftScore.toFixed(2)} (threshold ${driftThreshold ?? 'n/a'}).` : `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
       cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,
       llmResponse, cacheHit, ragContext, ragSources,
-      driftDetected, driftNonce, driftTerms,
+      driftDetected, driftNonce, driftTerms, driftScore, driftThreshold, decoyIds,
       steps, estimatedTokensSaved, sessionNonce, agentIdentity,
     };
   }

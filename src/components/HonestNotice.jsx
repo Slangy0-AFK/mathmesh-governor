@@ -28,6 +28,11 @@ export default function HonestNotice() {
             The pipeline also runs in the browser, so it governs cooperating agents. It is not a
             security boundary against a hostile caller — that would need to live server-side.
           </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Most importantly: this detects, it does not contain. There is no sandbox and no egress
+            filtering behind it, so a halt withholds a result rather than stopping an agent from
+            acting. The scorecard further down lists every requirement that is still missing.
+          </p>
         </div>
       </div>
     </div>

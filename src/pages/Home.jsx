@@ -9,6 +9,8 @@ import AgentIdentityManager from '@/components/AgentIdentityManager';
 import AuditLogViewer from '@/components/AuditLogViewer';
 import HowItWorksPanel from '@/components/HowItWorksPanel';
 import HonestNotice from '@/components/HonestNotice';
+import DriftEvaluationPanel from '@/components/DriftEvaluationPanel';
+import ReviewScorecard from '@/components/ReviewScorecard';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -396,7 +398,7 @@ export default function Home() {
                     { step: 7, gate: 'Base 3 — Prompt Compression' },
                     ...(llmEnabled ? [{ step: 8, gate: 'Cache Check — Response Memoization' }] : []),
                     ...(llmEnabled ? [{ step: 9, gate: 'RAG — Context Retrieval' }] : []),
-                    ...(llmEnabled ? [{ step: 10, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                    ...(llmEnabled ? [{ step: 10, gate: 'LLM — Processing' }] : []),
                     ...(llmEnabled ? [{ step: 11, gate: 'Tripwire — Drift Detection' }] : []),
                     ...(llmEnabled ? [{ step: 12, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
@@ -523,6 +525,16 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Detector evaluation */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <DriftEvaluationPanel />
+        </div>
+
+        {/* Review scorecard */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <ReviewScorecard />
         </div>
 
         {/* Knowledge Base Manager */}

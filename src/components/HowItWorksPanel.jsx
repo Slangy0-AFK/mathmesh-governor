@@ -47,14 +47,14 @@ const STAGES = [
     real: 'Uses an LLM to pick relevant Knowledge Base entries, then injects them as source-of-truth context. This reduces unsupported claims when your knowledge base actually covers the question. It does not prevent hallucination, and the retrieval step is itself an extra LLM call.',
   },
   {
-    name: 'Sonnet 4.6 — Safe Processing',
+    name: 'LLM — Processing',
     accent: 'text-indigo-300',
-    real: 'The actual work. Model routing defaults to "automatic", so the model used may not be Sonnet 4.6 despite the label.',
+    real: 'The actual work. Model routing defaults to "automatic", so the model used varies — the reported model name is whatever was actually requested. A random subset of decoys is injected here, before or after the task, and the chosen ids are handed to the tripwire.',
   },
   {
     name: 'Tripwire — Drift Detection',
     accent: 'text-rose-300',
-    real: 'Embeds a decoy instruction block and keyword-matches the response for signs the model engaged with it. It is a canary, not a lock: it can miss quiet drift and can false-positive on responses that merely mention the decoy terms. The logged nonce comes from a standard cryptographic RNG — there is no quantum hardware involved.',
+    real: 'Scores how strongly the response engaged each injected decoy, 0 to 1, and halts above a tuned threshold. This is an LLM judging the output, not embedding similarity — no embedding endpoint exists on this platform — so it costs a model call and is non-deterministic. The old keyword result is shown alongside it for comparison but decides nothing. Measured accuracy is in the evaluation panel below; if it has never been run, the detector has no known accuracy. Drift now soft-halts (freeze, reversible), not revoke. The nonce is a standard CSPRNG, not quantum.',
   },
   {
     name: 'Cache Store — Response Memoization',

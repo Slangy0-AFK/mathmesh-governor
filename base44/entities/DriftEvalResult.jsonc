@@ -1,0 +1,151 @@
+{
+  "name": "DriftEvalResult",
+  "type": "object",
+  "properties": {
+    "detector": {
+      "type": "string",
+      "enum": [
+        "semantic",
+        "keyword"
+      ],
+      "description": "Which detector was evaluated"
+    },
+    "model": {
+      "type": "string",
+      "default": "automatic",
+      "description": "Model used for the semantic judge"
+    },
+    "threshold": {
+      "type": "number",
+      "description": "Decision threshold used for the headline numbers"
+    },
+    "total_cases": {
+      "type": "number",
+      "description": "Number of labeled cases evaluated"
+    },
+    "drift_cases": {
+      "type": "number",
+      "description": "Ground-truth drift cases in the set"
+    },
+    "clean_cases": {
+      "type": "number",
+      "description": "Ground-truth clean cases in the set"
+    },
+    "true_positives": {
+      "type": "number",
+      "default": 0
+    },
+    "false_positives": {
+      "type": "number",
+      "default": 0
+    },
+    "true_negatives": {
+      "type": "number",
+      "default": 0
+    },
+    "false_negatives": {
+      "type": "number",
+      "default": 0
+    },
+    "tpr": {
+      "type": "number",
+      "description": "True positive rate (recall) \u2014 fraction of real drift caught"
+    },
+    "fpr": {
+      "type": "number",
+      "description": "False positive rate \u2014 fraction of clean responses wrongly flagged"
+    },
+    "errors": {
+      "type": "number",
+      "default": 0,
+      "description": "Cases where the detector itself failed to run"
+    },
+    "threshold_sweep": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "threshold": {
+            "type": "number"
+          },
+          "tpr": {
+            "type": "number"
+          },
+          "fpr": {
+            "type": "number"
+          },
+          "true_positives": {
+            "type": "number"
+          },
+          "false_positives": {
+            "type": "number"
+          },
+          "false_negatives": {
+            "type": "number"
+          },
+          "true_negatives": {
+            "type": "number"
+          }
+        }
+      },
+      "default": [],
+      "description": "TPR/FPR measured at each candidate threshold"
+    },
+    "case_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "expected_drift": {
+            "type": "boolean"
+          },
+          "predicted_drift": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          },
+          "correct": {
+            "type": "boolean"
+          },
+          "keyword_would_have_fired": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          },
+          "detector_error": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Per-case outcome for inspection"
+    },
+    "keyword_baseline_tpr": {
+      "type": "number",
+      "default": 0,
+      "description": "TPR of the old keyword detector on the same set, for comparison"
+    },
+    "keyword_baseline_fpr": {
+      "type": "number",
+      "default": 0,
+      "description": "FPR of the old keyword detector on the same set, for comparison"
+    },
+    "notes": {
+      "type": "string",
+      "default": "",
+      "description": "Caveats about this evaluation run"
+    }
+  },
+  "required": [
+    "detector",
+    "threshold",
+    "total_cases",
+    "tpr",
+    "fpr"
+  ]
+}
