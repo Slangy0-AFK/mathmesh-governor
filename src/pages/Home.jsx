@@ -618,7 +618,10 @@ export default function Home() {
 
         {/* Agent Identity Registry */}
         <div className="bg-white rounded-xl border border-slate-100 p-5">
-          <AgentIdentityManager />
+          <AgentIdentityManager onKeyIssued={(issuedAgentId, issuedKey) => {
+            setAgentId(issuedAgentId);
+            setAgentKey(issuedKey);
+          }} />
         </div>
 
         {/* Audit Log */}

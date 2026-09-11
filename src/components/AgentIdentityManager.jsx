@@ -18,7 +18,7 @@ const roleColors = {
   tool_caller: 'bg-amber-100 text-amber-700',
 };
 
-export default function AgentIdentityManager() {
+export default function AgentIdentityManager({ onKeyIssued }) {
   const [agents, setAgents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newAgentId, setNewAgentId] = useState('');
@@ -57,6 +57,7 @@ export default function AgentIdentityManager() {
     try {
       const res = await base44.functions.invoke('issueAgentKey', { agentId: agent.agent_id });
       setIssued(res.data);
+      onKeyIssued?.(res.data.agentId, res.data.key);
       loadAgents();
     } catch (err) {
       setIssued({ error: err?.response?.data?.error || err.message });
