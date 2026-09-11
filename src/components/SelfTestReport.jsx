@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { buildSelfTestPdf } from '@/lib/selfTestPdf';
-import { FileCheck2, Download, Loader2, Check, X, AlertTriangle } from 'lucide-react';
+import { buildPublicBriefPdf } from '@/lib/publicBriefPdf';
+import { FileCheck2, Download, Loader2, Check, X, AlertTriangle, EyeOff } from 'lucide-react';
 
 export default function SelfTestReport() {
   const [report, setReport] = useState(null);
@@ -22,10 +23,10 @@ export default function SelfTestReport() {
     setBusy(false);
   };
 
-  const download = () => {
-    const doc = buildSelfTestPdf(report);
-    doc.save(`mathmesh-selftest-${report.finishedAt.slice(0, 19).replace(/[:T]/g, '')}.pdf`);
-  };
+  const stamp = () => report.finishedAt.slice(0, 19).replace(/[:T]/g, '');
+
+  const download = () => buildSelfTestPdf(report).save(`mathmesh-selftest-${stamp()}.pdf`);
+  const downloadBrief = () => buildPublicBriefPdf(report).save(`agent-governance-brief-${stamp()}.pdf`);
 
   return (
     <div>
@@ -36,9 +37,14 @@ export default function SelfTestReport() {
           {busy ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Running…</> : 'Run signed test'}
         </Button>
         {report && (
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={download}>
-            <Download className="w-3 h-3 mr-1.5" />PDF
-          </Button>
+          <>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={downloadBrief}>
+              <EyeOff className="w-3 h-3 mr-1.5" />Brief PDF
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={download}>
+              <Download className="w-3 h-3 mr-1.5" />Technical PDF
+            </Button>
+          </>
         )}
       </div>
       <p className="text-xs text-slate-500 leading-relaxed mb-3">
@@ -94,8 +100,14 @@ export default function SelfTestReport() {
           </div>
 
           <p className="text-xs text-slate-400">
-            The PDF carries all {report.benefits.length} benefits and all {report.honestTakeaways.length} honest
-            limitations in full, plus this signature block.
+            <span className="font-medium text-slate-500">Brief PDF</span> — outcomes only, for outside readers:
+            benefits, what still needs independent confirmation, why it matters in the current AI landscape, the
+            rogue-agent question answered both ways, and a plain verdict. Thresholds, detection patterns and gate
+            internals are deliberately left out, since publishing them publishes the way around them.
+            <br />
+            <span className="font-medium text-slate-500">Technical PDF</span> — the full signed record: all{' '}
+            {report.benefits.length} benefits, all {report.honestTakeaways.length} limitations, per-case detail and
+            the signature block.
           </p>
         </div>
       )}
