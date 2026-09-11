@@ -1,6 +1,8 @@
 import { CheckCircle, XCircle, Circle } from 'lucide-react';
 
 const gateColors = {
+  'Identity — Verify Agent': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-slate-700 text-white' },
+  'Tool Gate — Action Allowlist': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-amber-600 text-white' },
   'Base 2 — Noise Stripper': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-slate-800 text-white' },
   'Base 60 — Circuit Breaker': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-amber-700 text-white' },
   'Base 8/10 — Matrix Voting': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-blue-800 text-white' },
@@ -9,6 +11,7 @@ const gateColors = {
   'Cache Check — Response Memoization': { pass: 'bg-amber-50 border-amber-200', fail: 'bg-red-50 border-red-200', badge: 'bg-amber-600 text-white' },
   'RAG — Context Retrieval': { pass: 'bg-cyan-50 border-cyan-200', fail: 'bg-red-50 border-red-200', badge: 'bg-cyan-700 text-white' },
   'Cache Store — Response Memoization': { pass: 'bg-amber-50 border-amber-200', fail: 'bg-red-50 border-red-200', badge: 'bg-amber-600 text-white' },
+  'Tripwire — Drift Detection': { pass: 'bg-emerald-50 border-emerald-200', fail: 'bg-red-50 border-red-200', badge: 'bg-rose-900 text-white' },
   'Sonnet 4.6 — Safe Processing': { pass: 'bg-indigo-50 border-indigo-200', fail: 'bg-red-50 border-red-200', badge: 'bg-indigo-900 text-white' },
 };
 

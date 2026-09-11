@@ -41,6 +41,8 @@
     "halted_at": {
       "type": "string",
       "enum": [
+        "Identity",
+        "Tool Gate",
         "Base 2",
         "Base 3",
         "Base 12",
@@ -48,6 +50,7 @@
         "Base 8/10",
         "RAG",
         "Sonnet 4.6",
+        "Tripwire",
         ""
       ],
       "default": "",
@@ -91,6 +94,21 @@
       "type": "string",
       "default": "",
       "description": "The LLM response if payload passed (or cached response)"
+    },
+    "drift_detected": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the tripwire detected canary engagement (drift)"
+    },
+    "drift_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "QRNG nonce from the tripwire halt event (for forensic correlation)"
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Session nonce for correlating audit events"
     },
     "tokens_saved_estimate": {
       "type": "number",

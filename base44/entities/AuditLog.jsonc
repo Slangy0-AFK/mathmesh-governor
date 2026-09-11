@@ -1,0 +1,68 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "IDENTITY_VERIFIED",
+        "IDENTITY_DENIED",
+        "TOOL_GATE_PASS",
+        "TOOL_GATE_DENIED",
+        "GATE_PASS",
+        "GATE_HALT",
+        "CACHE_HIT",
+        "CACHE_STORE",
+        "DRIFT_DETECTED",
+        "TRIPWIRE_PASS",
+        "AGENT_REVOKED",
+        "AGENT_FROZEN",
+        "PIPELINE_COMPLETE"
+      ],
+      "description": "Type of audit event"
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Agent that triggered this event"
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Session nonce for correlating events in the same session"
+    },
+    "event_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Unique 256-bit QRNG nonce for this event (generated server-side via crypto.randomBytes)"
+    },
+    "gate": {
+      "type": "string",
+      "default": "",
+      "description": "Which gate triggered this event (e.g. Base 2, Base 60, Tripwire, Tool Gate)"
+    },
+    "action": {
+      "type": "string",
+      "default": "",
+      "description": "The action being attempted when this event occurred"
+    },
+    "details": {
+      "type": "string",
+      "default": "",
+      "description": "Human-readable event details for forensics"
+    },
+    "drift_signal": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this event was triggered by a tripwire drift detection"
+    },
+    "halted_at": {
+      "type": "string",
+      "default": "",
+      "description": "If this is a halt event, which gate halted the pipeline"
+    }
+  },
+  "required": [
+    "event_type",
+    "agent_id"
+  ]
+}

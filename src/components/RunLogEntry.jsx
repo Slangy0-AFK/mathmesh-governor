@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Sparkles, BookOpen } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Sparkles, BookOpen, AlertTriangle, Lock } from 'lucide-react';
 import { useState } from 'react';
 
 const statusConfig = {
@@ -40,6 +40,12 @@ export default function RunLogEntry({ entry, index }) {
                 CACHE HIT
               </span>
             )}
+            {entry.driftDetected && (
+              <span className="text-xs bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                DRIFT
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5 truncate">{entry.message}</p>
         </div>
@@ -65,6 +71,29 @@ export default function RunLogEntry({ entry, index }) {
           <div className="text-xs text-slate-400 font-mono">
             Votes: [{entry.votes?.join(', ')}]
           </div>
+          {entry.driftDetected && (
+            <div className="mt-2 pt-2 border-t border-slate-100">
+              <p className="text-xs font-semibold text-rose-600 mb-1 flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3" />
+                TRIPWIRE DRIFT DETECTED
+              </p>
+              {entry.driftNonce && (
+                <p className="text-xs font-mono text-rose-400 mb-1 flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  nonce: {entry.driftNonce.slice(0, 32)}...
+                </p>
+              )}
+              {entry.driftTerms?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {entry.driftTerms.map((t, i) => (
+                    <span key={i} className="text-xs bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {entry.ragContext && (
             <div className="mt-2 pt-2 border-t border-slate-100">
               <p className="text-xs font-semibold text-cyan-600 mb-1 flex items-center gap-1.5">

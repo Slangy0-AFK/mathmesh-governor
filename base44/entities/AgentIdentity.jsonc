@@ -1,0 +1,74 @@
+{
+  "name": "AgentIdentity",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Unique agent identifier (e.g. FactChecker_1)"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "reader",
+        "writer",
+        "admin",
+        "tool_caller"
+      ],
+      "default": "reader",
+      "description": "Agent role \u2014 determines allowed actions via tool gate"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "revoked",
+        "frozen"
+      ],
+      "default": "active",
+      "description": "Agent lifecycle status. revoked = kill switch activated, frozen = temporary hold"
+    },
+    "allowed_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Action allowlist for this agent. Empty array means use role defaults. ['*'] means all actions."
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Current session nonce for attribution and audit correlation"
+    },
+    "total_runs": {
+      "type": "number",
+      "default": 0,
+      "description": "Total pipeline runs by this agent"
+    },
+    "halt_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of times this agent was halted by any gate"
+    },
+    "drift_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of tripwire drift events detected for this agent"
+    },
+    "last_drift_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "The QRNG nonce from the most recent drift event (for forensic correlation)"
+    },
+    "revoked_reason": {
+      "type": "string",
+      "default": "",
+      "description": "Why this agent was revoked/frozen (kill switch reason)"
+    }
+  },
+  "required": [
+    "agent_id",
+    "role",
+    "status"
+  ]
+}

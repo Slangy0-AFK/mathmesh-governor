@@ -5,13 +5,15 @@ import PipelineStepCard from '@/components/PipelineStepCard';
 import AgentStatePanel from '@/components/AgentStatePanel';
 import RunLogEntry from '@/components/RunLogEntry';
 import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
+import AgentIdentityManager from '@/components/AgentIdentityManager';
+import AuditLogViewer from '@/components/AuditLogViewer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Loader2, Sparkles, Database, Zap as ZapIcon } from 'lucide-react';
+import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Loader2, Sparkles, Database, Zap as ZapIcon, AlertTriangle, Lock } from 'lucide-react';
 
 const PRESETS = [
   {
@@ -112,6 +114,9 @@ export default function Home() {
         votes: r.votes || [],
         estimatedTokensSaved: r.tokens_saved_estimate || 0,
         cacheHit: r.cache_hit || false,
+        driftDetected: r.drift_detected || false,
+        driftNonce: r.drift_nonce || '',
+        sessionNonce: r.session_nonce || '',
         llmResponse: r.llm_response || '',
         ragContext: r.rag_context || '',
         ragSources: r.rag_sources || [],
@@ -161,6 +166,9 @@ export default function Home() {
           halted_at: result.haltedAt || '',
           halt_reason: result.status === 'HALTED' ? result.message : '',
           cache_hit: result.cacheHit || false,
+          drift_detected: result.driftDetected || false,
+          drift_nonce: result.driftNonce || '',
+          session_nonce: result.sessionNonce || '',
           rag_context: result.ragContext || '',
           rag_sources: result.ragSources || [],
           llm_response: result.llmResponse || '',
@@ -209,6 +217,7 @@ export default function Home() {
   const passedRuns = runLog.filter(r => r.status === 'PASSED').length;
   const cacheHits = runLog.filter(r => r.cacheHit).length;
   const totalSaved = runLog.reduce((acc, r) => acc + (r.estimatedTokensSaved || 0), 0);
+  const driftEvents = runLog.filter(r => r.driftDetected).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -241,12 +250,13 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
           {[
             { label: 'Total Runs', value: totalRuns, icon: Activity, color: 'text-slate-700' },
             { label: 'Passed', value: passedRuns, icon: Zap, color: 'text-emerald-600' },
             { label: 'Halted', value: haltedRuns, icon: Shield, color: 'text-red-500' },
             { label: 'Cache Hits', value: cacheHits, icon: ZapIcon, color: 'text-amber-600' },
+            { label: 'Drift Events', value: driftEvents, icon: AlertTriangle, color: 'text-rose-600' },
             { label: 'Chars Saved', value: totalSaved.toLocaleString(), icon: FlaskConical, color: 'text-blue-600' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white rounded-xl border border-slate-100 px-4 py-3 flex items-center gap-3">
@@ -373,15 +383,18 @@ export default function Home() {
                   ))
                 ) : (
                   [
-                    { step: 1, gate: 'Base 2 — Noise Stripper' },
-                    { step: 2, gate: 'Base 60 — Circuit Breaker' },
-                    { step: 3, gate: 'Base 8/10 — Matrix Voting' },
-                    ...(llmEnabled ? [{ step: 4, gate: 'Base 12 — Semantic Dedup' }] : []),
-                    { step: 5, gate: 'Base 3 — Prompt Compression' },
-                    ...(llmEnabled ? [{ step: 6, gate: 'Cache Check — Response Memoization' }] : []),
-                    ...(llmEnabled ? [{ step: 7, gate: 'RAG — Context Retrieval' }] : []),
-                    ...(llmEnabled ? [{ step: 8, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
-                    ...(llmEnabled ? [{ step: 9, gate: 'Cache Store — Response Memoization' }] : []),
+                    { step: 1, gate: 'Identity — Verify Agent' },
+                    { step: 2, gate: 'Tool Gate — Action Allowlist' },
+                    { step: 3, gate: 'Base 2 — Noise Stripper' },
+                    { step: 4, gate: 'Base 60 — Circuit Breaker' },
+                    { step: 5, gate: 'Base 8/10 — Matrix Voting' },
+                    ...(llmEnabled ? [{ step: 6, gate: 'Base 12 — Semantic Dedup' }] : []),
+                    { step: 7, gate: 'Base 3 — Prompt Compression' },
+                    ...(llmEnabled ? [{ step: 8, gate: 'Cache Check — Response Memoization' }] : []),
+                    ...(llmEnabled ? [{ step: 9, gate: 'RAG — Context Retrieval' }] : []),
+                    ...(llmEnabled ? [{ step: 10, gate: 'Sonnet 4.6 — Safe Processing' }] : []),
+                    ...(llmEnabled ? [{ step: 11, gate: 'Tripwire — Drift Detection' }] : []),
+                    ...(llmEnabled ? [{ step: 12, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
@@ -399,6 +412,8 @@ export default function Home() {
                 <div className={`mt-4 rounded-xl px-4 py-3 border ${
                   lastResult.status === 'PASSED'
                     ? 'bg-emerald-50 border-emerald-200'
+                    : lastResult.haltedAt === 'Tripwire'
+                    ? 'bg-rose-50 border-rose-200'
                     : 'bg-red-50 border-red-200'
                 }`}>
                   <div className="flex items-center gap-2 mb-1">
@@ -422,6 +437,27 @@ export default function Home() {
                     <p className="text-xs text-emerald-600 mt-1">
                       ~{lastResult.estimatedTokensSaved} characters of bloat stripped before tokenization.
                     </p>
+                  )}
+                  {lastResult.driftDetected && (
+                    <div className="mt-3 pt-3 border-t border-rose-200">
+                      <p className="text-xs font-semibold text-rose-600 mb-1 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3 h-3" />
+                        TRIPWIRE DRIFT DETECTED
+                      </p>
+                      <p className="text-xs font-mono text-rose-500 flex items-center gap-1">
+                        <Lock className="w-3 h-3" />
+                        QRNG Nonce: {lastResult.driftNonce?.slice(0, 32)}...
+                      </p>
+                      {lastResult.driftTerms?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {lastResult.driftTerms.map((t, i) => (
+                            <span key={i} className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                   {lastResult.llmResponse && (
                     <div className="mt-3 pt-3 border-t border-emerald-200">
@@ -458,6 +494,16 @@ export default function Home() {
             <div className="bg-slate-900 rounded-xl p-5 text-white">
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">How It Works</p>
               <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+                <div>
+                  <span className="font-semibold text-white">Identity — Verify Agent</span>
+                  <p>Every request is attributed to a registered agent identity. Revoked or frozen agents are rejected before any processing begins.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
+                  <span className="font-semibold text-white">Tool Gate — Action Allowlist</span>
+                  <p>Each agent role has an allowed action list. Unauthorized actions are denied before tokens are spent — no agent does what it isn't permitted to.</p>
+                </div>
+                <Separator className="bg-slate-700" />
                 <div>
                   <span className="font-semibold text-white">Base 2 — Noise Stripper</span>
                   <p>Binary Go/No-Go. Collapses whitespace, rejects empty or error-loop inputs before a single token is counted.</p>
@@ -499,6 +545,11 @@ export default function Home() {
                 </div>
                 <Separator className="bg-slate-700" />
                 <div>
+                  <span className="font-semibold text-rose-300">Tripwire — Drift Detection</span>
+                  <p>A Dogmatic Lock canary is embedded in every LLM prompt — decoy constraints P1-P8 that a well-behaved agent ignores. If the response engages the canary, the agent is frozen and a 256-bit QRNG nonce is logged. It's not a lock — it's a canary that only trips when something is wrong.</p>
+                </div>
+                <Separator className="bg-slate-700" />
+                <div>
                   <span className="font-semibold text-amber-300">Cache Store — Response Memoization</span>
                   <p>After a successful LLM call, the response is cached for future calls with the same action + payload fingerprint. The next identical call costs zero tokens.</p>
                 </div>
@@ -536,6 +587,16 @@ export default function Home() {
         {/* Knowledge Base Manager */}
         <div className="bg-white rounded-xl border border-slate-100 p-5">
           <KnowledgeBaseManager />
+        </div>
+
+        {/* Agent Identity Registry */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <AgentIdentityManager />
+        </div>
+
+        {/* Audit Log */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <AuditLogViewer />
         </div>
       </div>
     </div>

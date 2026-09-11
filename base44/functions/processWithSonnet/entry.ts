@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { CANARY_PROMPT } from '../../shared/canary.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -24,7 +25,7 @@ export default async function(req: Request): Promise<Response> {
 
 Process the following clean payload and provide a concise, accurate, structured response. Do not add filler or repetition — token efficiency is critical:
 
-${payload}${contextBlock}`;
+${payload}${contextBlock}${CANARY_PROMPT}`;
 
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
@@ -40,6 +41,7 @@ ${payload}${contextBlock}`;
       outputLength: responseText.length,
       contextInjected: !!(context && context.trim().length > 0),
       contextLength: context ? context.length : 0,
+      canaryInjected: true,
     });
   } catch (error) {
     return Response.json({ error: (error as Error).message }, { status: 500 });
