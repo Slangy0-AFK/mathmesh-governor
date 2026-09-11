@@ -95,6 +95,11 @@
       "default": "",
       "description": "The LLM response if payload passed (or cached response)"
     },
+    "output_hash": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 of the exact output text. Binds this output to the agent and session that produced it, so a text found later can be traced back to its origin."
+    },
     "drift_detected": {
       "type": "boolean",
       "default": false,
@@ -103,7 +108,7 @@
     "drift_nonce": {
       "type": "string",
       "default": "",
-      "description": "QRNG nonce from the tripwire halt event (for forensic correlation)"
+      "description": "CSPRNG nonce from the tripwire halt event (for forensic correlation)"
     },
     "session_nonce": {
       "type": "string",

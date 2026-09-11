@@ -19,6 +19,7 @@
  */
 
 import { base44 } from '@/api/base44Client';
+import { sha256Hex } from '@/lib/outputAttribution';
 
 const ROLE_DEFAULTS = {
   admin: ['*'],
@@ -190,12 +191,27 @@ export class MathMeshGovernor {
     return { allowed: false, reason: `Action "${action}" not permitted for role "${agent.role}"`, role: agent.role };
   }
 
+  /**
+   * Bind an output to the agent + session that produced it, and record the binding.
+   * Returns the digest so it can be stored on the run for later lookup.
+   */
+  async attributeOutput(agentId, sessionNonce, action, output) {
+    const outputHash = await sha256Hex(output);
+    await this.logAudit(
+      'OUTPUT_ATTRIBUTED', agentId, 'Attribution',
+      `Output bound to ${agentId} / session ${sessionNonce.slice(0, 12)}. SHA-256: ${outputHash}`,
+      { sessionNonce, action, outputHash },
+    );
+    return outputHash;
+  }
+
   async logAudit(eventType, agentId, gate, details, opts = {}) {
     try {
       await base44.entities.AuditLog.create({
         event_type: eventType,
         agent_id: agentId,
         session_nonce: opts.sessionNonce || '',
+        output_hash: opts.outputHash || '',
         gate,
         action: opts.action || '',
         details,
@@ -338,9 +354,11 @@ export class MathMeshGovernor {
         steps.push({ step: 8, gate: 'Cache Check — Response Memoization', passed: true, detail: `CACHE HIT — returning cached response. 0 LLM tokens spent.` });
         await this.logAudit('CACHE_HIT', agentId, 'Cache', `Cache hit for action "${currentAction}"`, { sessionNonce, action: currentAction });
         const totalSaved = compressionSaved + base2Result.cleanedText.length + cachedResponse.length;
+        const cachedHash = await this.attributeOutput(agentId, sessionNonce, currentAction, cachedResponse);
         return {
           status: 'PASSED', haltedAt: null, message: 'Cache hit! Response served from memoization cache. 0 LLM tokens spent.',
           cleanData: base2Result.cleanedText, compressedPayload, compressionSaved, llmResponse: cachedResponse, cacheHit: true,
+          outputHash: cachedHash,
           steps, estimatedTokensSaved: totalSaved, sessionNonce, agentIdentity,
         };
       }
@@ -377,6 +395,7 @@ export class MathMeshGovernor {
         try {
           const tripRes = await base44.functions.invoke('tripwireCheck', {
             response: llmResponse, agentId, sessionNonce, action: currentAction, decoyIds,
+            task: compressedPayload,
           });
           driftScore = tripRes.data.score ?? 0;
           driftThreshold = tripRes.data.threshold ?? null;
@@ -426,9 +445,11 @@ export class MathMeshGovernor {
     }
 
     const estimatedTokensSaved = Math.max(0, rawPayload.length - compressedPayload.length);
-    await this.logAudit('PIPELINE_COMPLETE', agentId, 'Pipeline', `Passed all gates. Status: PASSED.`, { sessionNonce, action: currentAction });
+    const outputHash = llmResponse ? await this.attributeOutput(agentId, sessionNonce, currentAction, llmResponse) : '';
+    await this.logAudit('PIPELINE_COMPLETE', agentId, 'Pipeline', `Passed all gates. Status: PASSED.`, { sessionNonce, action: currentAction, outputHash });
 
     return {
+      outputHash,
       status: 'PASSED', haltedAt: null,
       message: enableLLM ? `Passed all gates${ragContext ? ' with RAG grounding' : ''}. Tripwire clear at score ${driftScore.toFixed(2)} (threshold ${driftThreshold ?? 'n/a'}).` : `Passed Math Mesh. Proceeding to safe LLM processing for: "${base2Result.cleanedText.slice(0, 30)}..."`,
       cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,

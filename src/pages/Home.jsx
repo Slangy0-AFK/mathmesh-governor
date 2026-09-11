@@ -11,6 +11,7 @@ import HowItWorksPanel from '@/components/HowItWorksPanel';
 import HonestNotice from '@/components/HonestNotice';
 import DriftEvaluationPanel from '@/components/DriftEvaluationPanel';
 import ReviewScorecard from '@/components/ReviewScorecard';
+import OutputAttributionLookup from '@/components/OutputAttributionLookup';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -176,6 +177,7 @@ export default function Home() {
           rag_context: result.ragContext || '',
           rag_sources: result.ragSources || [],
           llm_response: result.llmResponse || '',
+          output_hash: result.outputHash || '',
           tokens_saved_estimate: result.estimatedTokensSaved || 0,
           compression_saved_chars: result.compressionSaved || 0,
           gate_details: result.steps || [],
@@ -525,6 +527,11 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Output attribution */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <OutputAttributionLookup />
         </div>
 
         {/* Detector evaluation */}

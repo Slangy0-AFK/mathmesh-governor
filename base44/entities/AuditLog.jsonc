@@ -13,6 +13,7 @@
         "GATE_HALT",
         "CACHE_HIT",
         "CACHE_STORE",
+        "OUTPUT_ATTRIBUTED",
         "DRIFT_DETECTED",
         "TRIPWIRE_PASS",
         "AGENT_REVOKED",
@@ -33,7 +34,12 @@
     "event_nonce": {
       "type": "string",
       "default": "",
-      "description": "Unique 256-bit QRNG nonce for this event (generated server-side via crypto.randomBytes)"
+      "description": "Unique 256-bit CSPRNG nonce for this event"
+    },
+    "output_hash": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 of the output text this event refers to, for attribution lookups"
     },
     "gate": {
       "type": "string",

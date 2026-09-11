@@ -35,7 +35,7 @@ export default async function(req: Request): Promise<Response> {
         c.response,
         c.decoyIds,
         (args) => base44.asServiceRole.integrations.Core.InvokeLLM(args as any),
-        { threshold: headlineThreshold, model },
+        { threshold: headlineThreshold, model, task: c.task },
       );
       const kw = keywordPrefilter(c.response, getDecoysByIds(c.decoyIds));
       scored.push({

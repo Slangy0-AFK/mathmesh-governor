@@ -8,7 +8,7 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { response, agentId, sessionNonce, action, decoyIds, threshold, model } = body;
+    const { response, agentId, sessionNonce, action, decoyIds, threshold, model, task } = body;
 
     if (!response || typeof response !== 'string') {
       return Response.json({ error: 'Missing response text' }, { status: 400 });
@@ -22,7 +22,13 @@ export default async function(req: Request): Promise<Response> {
       response,
       ids,
       (args) => base44.asServiceRole.integrations.Core.InvokeLLM(args as any),
-      { threshold: typeof threshold === 'number' ? threshold : DRIFT_THRESHOLD, model },
+      {
+        threshold: typeof threshold === 'number' ? threshold : DRIFT_THRESHOLD,
+        model,
+        // The real task, so the judge can tell an on-task answer from decoy
+        // engagement instead of guessing from topic overlap.
+        task: typeof task === 'string' ? task : undefined,
+      },
     );
 
     const topDecoy = [...result.perDecoy].sort((a, b) => b.score - a.score)[0] || null;
