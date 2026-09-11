@@ -6,6 +6,7 @@ import { sha256Hex } from '../../shared/agentKeys.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
 import { reserveTokens, reconcileTokens, refundTokens } from '../../shared/tokenLedger.ts';
+import { optimizeModelInput } from '../../shared/inputOptimizer.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -60,6 +61,12 @@ export default async function(req: Request): Promise<Response> {
       });
     }
 
+    // Reduce the actual model input on the server, before budget reservation. This is
+    // deliberately conservative: deterministic phrase shortening and whitespace cleanup
+    // preserve meaning while direct callers receive the same protection as the UI path.
+    const inputOptimization = optimizeModelInput(payload);
+    const optimizedPayload = inputOptimization.text;
+
     const contextBlock = context && typeof context === 'string' && context.trim().length > 0
       ? `\n\nGROUNDING CONTEXT — use this as your source of truth. Do not state facts not supported by this context:\n${context}\n\nIf the context does not contain the answer, say "I don't have enough grounded information to answer this."`
       : '';
@@ -68,7 +75,7 @@ export default async function(req: Request): Promise<Response> {
 
 Process the following clean payload and provide a concise, accurate, structured response. Do not add filler or repetition — token efficiency is critical:
 
-${payload}${contextBlock}`;
+${optimizedPayload}${contextBlock}`;
 
     // Multi-decoy canary: random subset, random order, random placement.
     // The chosen ids are returned so the tripwire knows what to compare against.
@@ -134,6 +141,10 @@ ${payload}${contextBlock}`;
       outputSignature,
       model: selectedModel,
       inputLength: payload.length,
+      optimizedInputLength: optimizedPayload.length,
+      inputCharsSaved: inputOptimization.savedChars,
+      estimatedInputTokensSaved: inputOptimization.estimatedTokensSaved,
+      inputCompressionRatio: inputOptimization.compressionRatio,
       outputLength: responseText.length,
       contextInjected: !!(context && context.trim().length > 0),
       contextLength: context ? context.length : 0,
