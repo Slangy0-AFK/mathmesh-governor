@@ -18,6 +18,7 @@ import EgressAllowlistPanel from '@/components/EgressAllowlistPanel';
 import TokenBudgetPanel from '@/components/TokenBudgetPanel';
 import AuditChainPanel from '@/components/AuditChainPanel';
 import GroundingReviewPanel from '@/components/GroundingReviewPanel';
+import SelfTestReport from '@/components/SelfTestReport';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -559,6 +560,11 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Signed self-test + exportable report */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <SelfTestReport />
         </div>
 
         {/* Token budget + grounding review — the two newest enforcement surfaces */}
