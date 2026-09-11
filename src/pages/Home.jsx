@@ -7,6 +7,8 @@ import RunLogEntry from '@/components/RunLogEntry';
 import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
 import AgentIdentityManager from '@/components/AgentIdentityManager';
 import AuditLogViewer from '@/components/AuditLogViewer';
+import HowItWorksPanel from '@/components/HowItWorksPanel';
+import HonestNotice from '@/components/HonestNotice';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -230,7 +232,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 leading-none">MathMesh Governor</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Agentic Harness · Multi-Base Token Filter · Sonnet 4.6</p>
+              <p className="text-xs text-slate-400 mt-0.5">Request pipeline simulator · Cache, filters &amp; drift canary</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -268,6 +270,8 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        <HonestNotice />
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
@@ -361,7 +365,7 @@ export default function Home() {
               {llmEnabled && (
                 <p className="text-xs text-indigo-500 flex items-center gap-1.5 justify-center">
                   <Sparkles className="w-3 h-3" />
-                  Base 12 + Cache + Sonnet 4.6 gates active — passed payloads are compressed, cache-checked, then processed by Claude.
+                  LLM-backed stages on: semantic dedup and knowledge retrieval each make their own model call, so a halted run still costs something.
                 </p>
               )}
             </div>
@@ -491,70 +495,7 @@ export default function Home() {
             </div>
 
             {/* How it works */}
-            <div className="bg-slate-900 rounded-xl p-5 text-white">
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">How It Works</p>
-              <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                <div>
-                  <span className="font-semibold text-white">Identity — Verify Agent</span>
-                  <p>Every request is attributed to a registered agent identity. Revoked or frozen agents are rejected before any processing begins.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-white">Tool Gate — Action Allowlist</span>
-                  <p>Each agent role has an allowed action list. Unauthorized actions are denied before tokens are spent — no agent does what it isn't permitted to.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-white">Base 2 — Noise Stripper</span>
-                  <p>Binary Go/No-Go. Collapses whitespace, rejects empty or error-loop inputs before a single token is counted.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-white">Base 10 — Matrix Voting</span>
-                  <p>Coordinate alignment check. All agent votes must share the same modulus-2 parity. Any mismatch signals agents are out of sync.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-indigo-300">Base 12 — Semantic Dedup</span>
-                  <p>Sonnet 4.6 checks if the current action is a rephrased duplicate of a recent one — catches loops that textual matching misses.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-white">Base 60 — Circuit Breaker</span>
-                  <p>Rotational loop governor. If any agent repeats the same action 3× in a row, the thread is killed cold. 0 tokens wasted.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-teal-300">Base 3 — Prompt Compression</span>
-                  <p>Rule-based, deterministic, free. Strips filler words, verbose phrases, and hedges before the LLM call — cutting input tokens on every passed run, on any model.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-amber-300">Cache Check — Response Memoization</span>
-                  <p>Before calling the LLM, checks a persistent cache keyed by action + compressed-payload fingerprint. If hit, returns the stored response instantly — zero tokens spent.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-cyan-300">RAG — Context Retrieval</span>
-                  <p>On cache miss, retrieves relevant entries from the Knowledge Base using semantic matching. The grounding context is injected into the Sonnet prompt — the model answers from facts, not memory, preventing hallucinations.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-indigo-300">Sonnet 4.6 — Safe Processing</span>
-                  <p>Only payloads that pass ALL gates and miss the cache reach Claude Sonnet 4.6 for actual processing. Every halted run and every cache hit saves a full LLM call.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-rose-300">Tripwire — Drift Detection</span>
-                  <p>A Dogmatic Lock canary is embedded in every LLM prompt — decoy constraints P1-P8 that a well-behaved agent ignores. If the response engages the canary, the agent is frozen and a 256-bit QRNG nonce is logged. It's not a lock — it's a canary that only trips when something is wrong.</p>
-                </div>
-                <Separator className="bg-slate-700" />
-                <div>
-                  <span className="font-semibold text-amber-300">Cache Store — Response Memoization</span>
-                  <p>After a successful LLM call, the response is cached for future calls with the same action + payload fingerprint. The next identical call costs zero tokens.</p>
-                </div>
-              </div>
-            </div>
+            <HowItWorksPanel />
           </div>
         </div>
 
