@@ -305,6 +305,9 @@ export class MathMeshGovernor {
       try {
         const res = await base44.functions.invoke('processWithSonnet', {
           payload: compressedPayload, action: currentAction, agentId, context: ragContext,
+          // One-time ticket from admission. Without it the model function runs
+          // admission itself, so this is an optimisation, not the gate.
+          admissionTicket: admission.ticket,
         });
         llmResponse = res.data.response || '';
         decoyIds = res.data.decoyIds || [];

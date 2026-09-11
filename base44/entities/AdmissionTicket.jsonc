@@ -1,0 +1,43 @@
+{
+  "name": "AdmissionTicket",
+  "type": "object",
+  "properties": {
+    "ticket": {
+      "type": "string",
+      "description": "Unique one-time-use admission token. A request may only spend model credits by presenting an unconsumed ticket."
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "The agent this ticket was issued to. A ticket is not transferable to another agent."
+    },
+    "action": {
+      "type": "string",
+      "description": "The action this ticket was issued for. A ticket is not valid for a different action."
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Session nonce at issue time, for audit correlation"
+    },
+    "consumed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once the ticket has been spent. Prevents replaying one admission across many model calls."
+    },
+    "consumed_by": {
+      "type": "string",
+      "default": "",
+      "description": "Which function consumed this ticket"
+    },
+    "rejected": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this reservation lost the rate-limit ordering and was refused. Kept for forensics rather than deleted."
+    }
+  },
+  "required": [
+    "ticket",
+    "agent_id",
+    "action"
+  ]
+}

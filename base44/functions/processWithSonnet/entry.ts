@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { selectDecoys } from '../../shared/decoys.ts';
+import { admitRequest, consumeTicket } from '../../shared/admission.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -8,7 +9,7 @@ export default async function(req: Request): Promise<Response> {
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { payload, action, agentId, context, model } = body;
+    const { payload, action, agentId, context, model, admissionTicket } = body;
     const selectedModel = typeof model === 'string' && model.trim().length > 0 ? model : 'automatic';
 
     if (!payload || typeof payload !== 'string' || payload.length < 3) {
@@ -16,6 +17,40 @@ export default async function(req: Request): Promise<Response> {
     }
     if (payload.length > 8000) {
       return Response.json({ error: 'Payload too large' }, { status: 400 });
+    }
+    if (!agentId || typeof agentId !== 'string' || !action || typeof action !== 'string') {
+      return Response.json({ error: 'agentId and action are required' }, { status: 400 });
+    }
+
+    // ADMISSION IS PART OF THE SPEND PATH.
+    // Either the caller presents a valid unconsumed ticket from admission control, or
+    // this function runs admission itself. There is no third option, so calling this
+    // endpoint directly no longer skips identity, the kill switch, the tool gate, the
+    // rate limit or the loop breaker.
+    const svc = base44.asServiceRole;
+    let admissionSource = 'ticket';
+    if (admissionTicket) {
+      const spent = await consumeTicket(svc, {
+        ticket: String(admissionTicket), agentId, action, consumedBy: 'processWithSonnet',
+      });
+      if (!spent.ok) {
+        return Response.json({
+          error: `Admission denied: ${spent.reason}`,
+          haltedAt: 'Admission', enforcement: 'none', serverEnforced: true,
+        }, { status: 403 });
+      }
+    } else {
+      admissionSource = 'inline';
+      const verdict = await admitRequest(svc, { agentId, action, sessionNonce: body.sessionNonce });
+      if (!verdict.admitted) {
+        return Response.json({
+          error: `Admission denied at ${verdict.haltedAt}: ${verdict.reason}`,
+          haltedAt: verdict.haltedAt, enforcement: verdict.enforcement, serverEnforced: true,
+        }, { status: 403 });
+      }
+      await consumeTicket(svc, {
+        ticket: verdict.ticket!, agentId, action, consumedBy: 'processWithSonnet (inline admission)',
+      });
     }
 
     const contextBlock = context && typeof context === 'string' && context.trim().length > 0
@@ -49,6 +84,7 @@ ${payload}${contextBlock}`;
       outputLength: responseText.length,
       contextInjected: !!(context && context.trim().length > 0),
       contextLength: context ? context.length : 0,
+      admissionSource,
       decoyIds: decoys.decoyIds,
       decoyPlacement: decoys.placement,
     });
