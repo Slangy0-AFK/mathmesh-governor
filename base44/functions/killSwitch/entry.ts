@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
 import { generateNonce } from '../../shared/semanticDrift.ts';
+import { appendAudit } from '../../shared/auditChain.ts';
 
 /**
  * Kill switch — operator control over the harness.
@@ -30,7 +31,7 @@ export default async function(req: Request): Promise<Response> {
     const nonce = generateNonce();
 
     const audit = async (eventType: string, agent: string, details: string, enforcement: string) => {
-      await svc.entities.AuditLog.create({
+      await appendAudit(svc, {
         event_type: eventType,
         agent_id: agent || 'ALL',
         event_nonce: nonce,
@@ -61,10 +62,15 @@ export default async function(req: Request): Promise<Response> {
 
     if (mode === 'set_policy') {
       const patch: Record<string, unknown> = {};
-      for (const key of ['max_runs_per_window', 'window_seconds', 'loop_repeat_limit', 'drift_strikes_before_revoke']) {
+      for (const key of [
+        'max_runs_per_window', 'window_seconds', 'loop_repeat_limit', 'drift_strikes_before_revoke',
+        'max_tokens_per_window', 'token_window_seconds', 'max_tokens_per_request', 'grounding_block_threshold',
+      ]) {
         if (typeof body[key] === 'number' && body[key] > 0) patch[key] = body[key];
       }
-      if (typeof body.auto_revoke_on_drift === 'boolean') patch.auto_revoke_on_drift = body.auto_revoke_on_drift;
+      for (const flag of ['auto_revoke_on_drift', 'enforce_token_budget', 'require_grounding']) {
+        if (typeof body[flag] === 'boolean') patch[flag] = body[flag];
+      }
       if (Object.keys(patch).length === 0) {
         return Response.json({ error: 'No valid policy fields supplied' }, { status: 400 });
       }

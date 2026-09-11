@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { admitRequest } from '../../shared/admission.ts';
+import { appendAudit } from '../../shared/auditChain.ts';
 
 /**
  * Egress proxy — the only outbound network path the harness controls.
@@ -42,7 +43,7 @@ export default async function (req: Request): Promise<Response> {
     }
 
     const blocked = async (reason: string, host: string) => {
-      await svc.entities.AuditLog.create({
+      await appendAudit(svc, {
         event_type: 'EGRESS_BLOCKED', agent_id: agentId, gate: 'Egress',
         session_nonce: body.sessionNonce || '', action,
         details: `BLOCKED ${method} ${host}: ${reason}`,
@@ -90,7 +91,7 @@ export default async function (req: Request): Promise<Response> {
     const truncated = raw.length > 20000;
 
     await svc.entities.EgressAllowlist.update(entry.id, { request_count: (entry.request_count || 0) + 1 });
-    await svc.entities.AuditLog.create({
+    await appendAudit(svc, {
       event_type: 'EGRESS_ALLOWED', agent_id: agentId, gate: 'Egress',
       session_nonce: body.sessionNonce || '', action,
       details: `ALLOWED ${method} https://${parsed.hostname}${parsed.pathname} → ${upstream.status}, ${raw.length} bytes.`,

@@ -38,10 +38,15 @@ async function hmacKey(): Promise<CryptoKey> {
   );
 }
 
-export async function signOutput(subject: SigningSubject): Promise<string> {
+/** HMAC an arbitrary canonical message. Used by the audit chain as well as outputs. */
+export async function signMessage(message: string): Promise<string> {
   const key = await hmacKey();
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(canonicalMessage(subject)));
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
   return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function signOutput(subject: SigningSubject): Promise<string> {
+  return await signMessage(canonicalMessage(subject));
 }
 
 export async function verifyOutputSignature(subject: SigningSubject, signature: string): Promise<boolean> {

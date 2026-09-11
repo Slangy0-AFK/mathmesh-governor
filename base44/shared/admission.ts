@@ -15,6 +15,8 @@ import { loadPolicy, type HarnessPolicy } from './harnessPolicy.ts';
 import { checkToolGate } from './enforcement.ts';
 import { generateNonce } from './semanticDrift.ts';
 import { verifyAgentKey } from './agentKeys.ts';
+import { appendAudit } from './auditChain.ts';
+import { windowSpend } from './tokenLedger.ts';
 
 export interface AdmissionVerdict {
   admitted: boolean;
@@ -33,12 +35,16 @@ export interface AdmissionVerdict {
   windowSeconds?: number;
   repeatCount?: number;
   loopLimit?: number;
+  tokensSpent?: number;
+  tokenLimit?: number;
+  tokenWindowSeconds?: number;
   policy?: HarnessPolicy;
 }
 
 async function audit(svc: any, fields: Record<string, unknown>) {
   try {
-    await svc.entities.AuditLog.create({ server_enforced: true, gate: 'Admission', ...fields });
+    // Chained writer, so an admission decision cannot be quietly edited out later.
+    await appendAudit(svc, { server_enforced: true, gate: 'Admission', ...fields });
   } catch { /* auditing must never be the reason a deny fails to apply */ }
 }
 
@@ -186,8 +192,28 @@ export async function admitRequest(
     );
   }
 
+  // 7. Token budget — the bound that actually corresponds to exhaustion. This is a
+  //    cheap pre-check on what the agent has already spent; the exact reservation for
+  //    this request happens in the spend path, where the real prompt exists.
+  let tokensSpent = 0;
+  try {
+    tokensSpent = await windowSpend(svc, agentId, policy.token_window_seconds);
+  } catch { /* ledger unreadable — the spend path still reserves, so do not deny here */ }
+
+  if (policy.enforce_token_budget && tokensSpent >= policy.max_tokens_per_window) {
+    await svc.entities.AdmissionTicket.update(reservation.id, { rejected: true });
+    await svc.entities.AgentIdentity.update(agent.id, { halt_count: (agent.halt_count || 0) + 1 });
+    return await deny(
+      'Token Budget',
+      `Token budget exhausted: ~${tokensSpent} of ${policy.max_tokens_per_window} estimated tokens spent in the last ${policy.token_window_seconds}s. Counts include the harness's own judge calls.`,
+      'TOKEN_BUDGET_EXCEEDED', 'budget_exhausted',
+      { agent, tokensSpent, tokenLimit: policy.max_tokens_per_window },
+    );
+  }
+
   await audit(svc, {
     event_type: 'ADMISSION_PASS', agent_id: agentId, session_nonce: sessionNonce, action,
+    tokens_total: 0,
     details: `Admitted. ${keyVerdict.reason} Role "${agent.role}" (${gate.reason}). ${position}/${policy.max_runs_per_window} in the ${policy.window_seconds}s window. Consecutive repeats: ${repeatCount}.`,
     enforcement: 'none',
   });
@@ -201,6 +227,8 @@ export async function admitRequest(
     keyReason: keyVerdict.reason, authenticated: !!(agent.key_hash || '').trim(),
     windowCount: position, windowLimit: policy.max_runs_per_window,
     windowSeconds: policy.window_seconds, repeatCount, loopLimit: policy.loop_repeat_limit,
+    tokensSpent, tokenLimit: policy.max_tokens_per_window,
+    tokenWindowSeconds: policy.token_window_seconds,
     policy,
   };
 }

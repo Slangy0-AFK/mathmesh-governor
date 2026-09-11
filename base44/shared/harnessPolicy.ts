@@ -13,6 +13,12 @@ export interface HarnessPolicy {
   require_agent_key: boolean;
   max_runs_per_window: number;
   window_seconds: number;
+  max_tokens_per_window: number;
+  token_window_seconds: number;
+  max_tokens_per_request: number;
+  enforce_token_budget: boolean;
+  require_grounding: boolean;
+  grounding_block_threshold: number;
   loop_repeat_limit: number;
   drift_strikes_before_revoke: number;
   auto_revoke_on_drift: boolean;
@@ -25,6 +31,14 @@ export const POLICY_DEFAULTS: HarnessPolicy = {
   require_agent_key: true,
   max_runs_per_window: 20,
   window_seconds: 60,
+  // The bound that actually matters for exhaustion: tokens, not requests.
+  max_tokens_per_window: 40000,
+  token_window_seconds: 3600,
+  max_tokens_per_request: 6000,
+  enforce_token_budget: true,
+  // Cite-or-admit on by default: an unverifiable answer is withheld, not returned.
+  require_grounding: true,
+  grounding_block_threshold: 1,
   loop_repeat_limit: 3,
   drift_strikes_before_revoke: 2,
   auto_revoke_on_drift: true,
@@ -49,6 +63,12 @@ export async function loadPolicy(serviceRole: any): Promise<HarnessPolicy> {
         require_agent_key: r.require_agent_key !== false,
         max_runs_per_window: numOr(r.max_runs_per_window, POLICY_DEFAULTS.max_runs_per_window),
         window_seconds: numOr(r.window_seconds, POLICY_DEFAULTS.window_seconds),
+        max_tokens_per_window: numOr(r.max_tokens_per_window, POLICY_DEFAULTS.max_tokens_per_window),
+        token_window_seconds: numOr(r.token_window_seconds, POLICY_DEFAULTS.token_window_seconds),
+        max_tokens_per_request: numOr(r.max_tokens_per_request, POLICY_DEFAULTS.max_tokens_per_request),
+        enforce_token_budget: r.enforce_token_budget !== false,
+        require_grounding: r.require_grounding !== false,
+        grounding_block_threshold: numOr(r.grounding_block_threshold, POLICY_DEFAULTS.grounding_block_threshold),
         loop_repeat_limit: numOr(r.loop_repeat_limit, POLICY_DEFAULTS.loop_repeat_limit),
         drift_strikes_before_revoke: numOr(r.drift_strikes_before_revoke, POLICY_DEFAULTS.drift_strikes_before_revoke),
         auto_revoke_on_drift: r.auto_revoke_on_drift !== false,

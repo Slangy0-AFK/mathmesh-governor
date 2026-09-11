@@ -1,0 +1,71 @@
+{
+  "name": "TokenSpend",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "The agent whose budget this spend is drawn against"
+    },
+    "action": {
+      "type": "string",
+      "default": "",
+      "description": "The action being performed when these tokens were spent"
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Session nonce for correlating spend with the run that caused it"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "reserved",
+        "actual",
+        "refunded"
+      ],
+      "default": "reserved",
+      "description": "reserved = charged before the call from an estimate, actual = reconciled to the real size after the call, refunded = the call never happened so the reservation was released"
+    },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "generation",
+        "judge",
+        "dedup",
+        "eval",
+        "other"
+      ],
+      "default": "generation",
+      "description": "What the tokens were spent on. 'judge' and 'dedup' are the harness's OWN overhead, counted honestly against the same budget rather than hidden."
+    },
+    "tokens_in": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated input tokens (prompt, context and decoys included)"
+    },
+    "tokens_out": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated output tokens"
+    },
+    "tokens_total": {
+      "type": "number",
+      "default": 0,
+      "description": "tokens_in + tokens_out. This is the number the budget is enforced on."
+    },
+    "estimated": {
+      "type": "boolean",
+      "default": true,
+      "description": "True because these counts come from a chars/4 approximation, not from a provider usage report. The platform's InvokeLLM does not return usage, so every number here is an estimate and must be read as one."
+    },
+    "note": {
+      "type": "string",
+      "default": "",
+      "description": "Why this row exists, for forensics"
+    }
+  },
+  "required": [
+    "agent_id",
+    "tokens_total"
+  ]
+}

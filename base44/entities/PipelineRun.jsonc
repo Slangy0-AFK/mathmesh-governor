@@ -46,6 +46,7 @@
         "Identity",
         "Tool Gate",
         "Rate Limit",
+        "Token Budget",
         "Egress",
         "Base 2",
         "Base 3",
@@ -55,6 +56,8 @@
         "RAG",
         "Sonnet 4.6",
         "Tripwire",
+        "Grounding",
+        "Runtime",
         ""
       ],
       "default": "",
@@ -73,10 +76,12 @@
         "freeze",
         "revoke",
         "rate_limited",
-        "kill_all"
+        "kill_all",
+        "budget_exhausted",
+        "output_withheld"
       ],
       "default": "",
-      "description": "What the harness did to the agent as a result of this run"
+      "description": "What the harness did to the agent or its output as a result of this run"
     },
     "authenticated": {
       "type": "boolean",
@@ -87,6 +92,38 @@
       "type": "boolean",
       "default": false,
       "description": "True if the response was served from the memoization cache"
+    },
+    "tokens_spent": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated tokens this run charged to the agent's budget for generating the answer"
+    },
+    "judge_tokens": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated tokens the harness spent judging this run \u2014 its own overhead, recorded rather than hidden"
+    },
+    "grounding_verdict": {
+      "type": "string",
+      "enum": [
+        "",
+        "grounded",
+        "partly_grounded",
+        "ungrounded",
+        "not_checked"
+      ],
+      "default": "",
+      "description": "Whether the response's factual claims traced back to the retrieved context"
+    },
+    "unsupported_claims": {
+      "type": "number",
+      "default": 0,
+      "description": "How many factual claims could not be cited to the context"
+    },
+    "output_withheld": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the harness refused to return the response because it failed cite-or-admit"
     },
     "rag_context": {
       "type": "string",

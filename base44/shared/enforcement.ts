@@ -6,6 +6,8 @@
  * are advisory, these are binding.
  */
 
+import { appendAudit } from './auditChain.ts';
+
 export interface AgentRecord {
   id: string;
   agent_id: string;
@@ -139,7 +141,7 @@ export async function escalateOnDrift(
     });
   }
 
-  await serviceRole.entities.AuditLog.create({
+  await appendAudit(serviceRole, {
     event_type: shouldRevoke ? 'AGENT_REVOKED' : 'AGENT_FROZEN',
     agent_id: agent?.agent_id || 'unknown',
     event_nonce: detail.nonce,

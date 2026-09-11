@@ -5,14 +5,16 @@
  *
  * SERVER-ENFORCED (binding — the client cannot skip or fake these):
  *   1. Admission Control — global stop, identity, lifecycle, tool gate,
- *      per-identity rate limit, persistent loop breaker
+ *      per-identity rate limit, persistent loop breaker, TOKEN BUDGET
  *   9. Tripwire — drift detection, and the kill switch that acts on it
+ *  10. Grounding — cite-or-admit; an uncited answer is withheld, not returned
  *
  * CLIENT-SIDE (advisory — cost and hygiene filters, not security boundaries):
  *   2. Base 2 noise strip · 3. Base 10 vote parity · 4. Base 12 semantic dedup
- *   5. Base 3 compression · 6. Cache check · 7. RAG · 8. LLM · 10. Cache store
+ *   5. Base 3 compression · 6. Cache check · 7. RAG · 8. LLM · 11. Cache store
  *
- * Sandbox and egress control sit below the app layer and are not present.
+ * A real sandbox still sits below the app layer and is not present, so a halt stops
+ * OUTPUT, not action.
  */
 
 import { base44 } from '@/api/base44Client';
@@ -137,9 +139,14 @@ export class MathMeshGovernor {
     return outputHash;
   }
 
+  /**
+   * Client-side events go through the server writer so they join the hash chain.
+   * Writing straight to the table would produce rows that are unsigned, unsequenced,
+   * and removable without a trace.
+   */
   async logAudit(eventType, agentId, gate, details, opts = {}) {
     try {
-      await base44.entities.AuditLog.create({
+      await base44.functions.invoke('recordAudit', {
         event_type: eventType,
         agent_id: agentId,
         session_nonce: opts.sessionNonce || '',
@@ -151,7 +158,7 @@ export class MathMeshGovernor {
         enforcement: opts.enforcement || '',
         halted_at: opts.haltedAt || '',
       });
-    } catch (err) { /* fail silently */ }
+    } catch (err) { /* fail silently — auditing must not break the run */ }
   }
 
   /** Operator kill switch — decided and applied server-side, admin only. */
@@ -270,6 +277,11 @@ export class MathMeshGovernor {
     let driftThreshold = null;
     let decoyIds = [];
     let enforcement = 'none';
+    let budget = null;
+    let tokensSpent = 0;
+    let grounding = null;
+    let outputWithheld = false;
+    let judgeTokens = 0;
     // Signed server-side at the point of generation; the client only carries it.
     let outputSignature = '';
 
@@ -315,9 +327,11 @@ export class MathMeshGovernor {
         llmResponse = res.data.response || '';
         outputSignature = res.data.outputSignature || '';
         decoyIds = res.data.decoyIds || [];
+        budget = res.data.budget || null;
+        tokensSpent = res.data.tokens || 0;
         steps.push({
           step: 8, gate: 'LLM — Processing', passed: true,
-          detail: `Model "${res.data.model || 'automatic'}" processed ${compressedPayload.length} chars${ragContext ? ` + ${ragContext.length} chars grounding context` : ''}. Output: ${llmResponse.length} chars. Decoys injected ${res.data.decoyPlacement === 'before_task' ? 'before' : 'after'} the task: ${decoyIds.join(', ') || 'none'}.`,
+          detail: `Model "${res.data.model || 'automatic'}" processed ${compressedPayload.length} chars${ragContext ? ` + ${ragContext.length} chars grounding context` : ''}. Output: ${llmResponse.length} chars. Spend ~${tokensSpent} est. tokens${budget ? `, ~${budget.remaining} left of ${budget.limit} in this window` : ''}. Decoys injected ${res.data.decoyPlacement === 'before_task' ? 'before' : 'after'} the task: ${decoyIds.join(', ') || 'none'}.`,
         });
 
         // Step 9: Tripwire — SERVER-ENFORCED drift detection + kill switch
@@ -325,7 +339,12 @@ export class MathMeshGovernor {
           const tripRes = await base44.functions.invoke('tripwireCheck', {
             response: llmResponse, agentId, sessionNonce, action: currentAction, decoyIds,
             task: compressedPayload,
+            // The same context the model was given, so claims can be checked against it.
+            context: ragContext,
           });
+          grounding = tripRes.data.grounding || null;
+          outputWithheld = !!tripRes.data.outputWithheld;
+          judgeTokens = tripRes.data.judgeTokens || 0;
           driftScore = tripRes.data.score ?? 0;
           driftThreshold = tripRes.data.threshold ?? null;
           const kwNote = tripRes.data.keywordWouldHaveFired
@@ -352,17 +371,40 @@ export class MathMeshGovernor {
           }
           steps.push({
             step: 9, gate: 'Tripwire — Drift Detection', passed: true,
-            detail: tripRes.data.detectorError
-              ? `NOT CHECKED — ${tripRes.data.detectorError}`
-              : `Max engagement score ${driftScore.toFixed(2)} < threshold ${driftThreshold} across ${decoyIds.length} decoys.${kwNote}`,
+            detail: `${tripRes.data.detectorError ? `NOT CHECKED — ${tripRes.data.detectorError}` : `Max engagement score ${driftScore.toFixed(2)} < threshold ${driftThreshold} across ${decoyIds.length} decoys.`}${kwNote} Judge cost ~${judgeTokens} est. tokens (drift + grounding in one call).`,
           });
+
+          // Step 10: Grounding — cite or admit. Same judge call, separate verdict.
+          if (grounding) {
+            const g = grounding;
+            steps.push({
+              step: 10, gate: 'Grounding — Cite or Admit',
+              passed: !g.withheld && !g.error,
+              detail: g.error
+                ? `NOT CHECKED — ${g.error}`
+                : `${g.totalClaims - g.unsupportedCount}/${g.totalClaims} factual claims cited to the retrieved context. Verdict: ${g.verdict}.${g.withheld ? ' OUTPUT WITHHELD and queued for human review — an uncited claim is treated as unverified, not as true.' : ''}`,
+            });
+          }
+
+          if (outputWithheld) {
+            return {
+              status: 'HALTED', haltedAt: 'Grounding',
+              message: `Output withheld: ${grounding.unsupportedCount} of ${grounding.totalClaims} factual claims could not be traced to the retrieved context. Queued for human review rather than returned as verified.`,
+              steps, cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,
+              ragContext, ragSources, grounding, outputWithheld: true, serverEnforced: true,
+              enforcement: 'output_withheld', budget, tokensSpent, judgeTokens,
+              outputHash: await this.attributeOutput(agentId, sessionNonce, currentAction, llmResponse),
+              estimatedTokensSaved: compressionSaved, sessionNonce, agentIdentity,
+            };
+          }
         } catch (err) {
           steps.push({ step: 9, gate: 'Tripwire — Drift Detection', passed: false, detail: `Tripwire check failed: ${err.message}. Proceeding (fail-open).` });
         }
 
-        // Step 10: Cache Store
+        // Step 11: Cache Store — only reached by an output that passed both verdicts,
+        // so a withheld or drifted answer never becomes a cached one.
         await this.storeInCache(currentAction, compressedPayload, llmResponse, agentId);
-        steps.push({ step: 10, gate: 'Cache Store — Response Memoization', passed: true, detail: 'Response cached for future calls with same action + payload fingerprint.' });
+        steps.push({ step: 11, gate: 'Cache Store — Response Memoization', passed: true, detail: 'Response cached for future calls with same action + payload fingerprint.' });
       } catch (err) {
         steps.push({ step: 8, gate: 'LLM — Processing', passed: false, detail: `LLM processing failed: ${err.message}` });
         return {
@@ -379,6 +421,7 @@ export class MathMeshGovernor {
 
     return {
       outputHash, outputSignature, enforcement,
+      budget, tokensSpent, judgeTokens, grounding, outputWithheld: false,
       authenticated: !!admission.authenticated,
       status: 'PASSED', haltedAt: null,
       message: enableLLM ? `Passed all gates${ragContext ? ' with RAG grounding' : ''}. Tripwire clear at score ${driftScore.toFixed(2)} (threshold ${driftThreshold ?? 'n/a'}).` : `Passed admission and the free gates for: "${base2Result.cleanedText.slice(0, 30)}..."`,

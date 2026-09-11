@@ -37,6 +37,36 @@
       "default": 60,
       "description": "Rate limit window length in seconds"
     },
+    "max_tokens_per_window": {
+      "type": "number",
+      "default": 40000,
+      "description": "Maximum estimated tokens an agent may spend per token window, counting the harness's own judge and dedup calls. This is the real exhaustion bound \u2014 a request cap alone lets one agent spend a hundred times another agent's tokens in the same number of calls."
+    },
+    "token_window_seconds": {
+      "type": "number",
+      "default": 3600,
+      "description": "Token budget window length in seconds. Longer than the rate-limit window on purpose: bursts are a rate problem, sustained spend is a budget problem."
+    },
+    "max_tokens_per_request": {
+      "type": "number",
+      "default": 6000,
+      "description": "Hard ceiling on the estimated size of any single request, so one oversized payload cannot drain a whole window"
+    },
+    "enforce_token_budget": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false, spend is still recorded and visible but never denied \u2014 measurement without enforcement"
+    },
+    "require_grounding": {
+      "type": "boolean",
+      "default": true,
+      "description": "When true, a response whose factual claims are not supported by the retrieved context is withheld from the caller and queued for human review instead of being returned as if it were verified"
+    },
+    "grounding_block_threshold": {
+      "type": "number",
+      "default": 1,
+      "description": "How many unsupported claims are tolerated before the response is withheld. 1 means withhold on the first unsupported claim."
+    },
     "loop_repeat_limit": {
       "type": "number",
       "default": 3,

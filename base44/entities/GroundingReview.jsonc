@@ -1,0 +1,111 @@
+{
+  "name": "GroundingReview",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "The agent that produced the response under review"
+    },
+    "action": {
+      "type": "string",
+      "default": "",
+      "description": "The action that produced this response"
+    },
+    "session_nonce": {
+      "type": "string",
+      "default": "",
+      "description": "Session nonce of the run"
+    },
+    "output_hash": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 of the response text, linking this review to the attributed output"
+    },
+    "response_text": {
+      "type": "string",
+      "default": "",
+      "description": "The response as generated, held so a reviewer can judge it without rerunning anything"
+    },
+    "context_provided": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether grounding context was actually retrieved for this run. With no context there is nothing to cite, so an unsupported claim means something different."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "grounded",
+        "partly_grounded",
+        "ungrounded",
+        "not_checked"
+      ],
+      "default": "not_checked",
+      "description": "Whether every factual claim traced back to the supplied context"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "type": "string"
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "default": [],
+      "description": "Each factual claim extracted from the response, with whether the context supports it and the supporting quote"
+    },
+    "unsupported_count": {
+      "type": "number",
+      "default": 0,
+      "description": "How many claims the context did not support"
+    },
+    "total_claims": {
+      "type": "number",
+      "default": 0,
+      "description": "How many factual claims were extracted"
+    },
+    "blocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the harness withheld this response from the caller because it failed the cite-or-admit rule"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected"
+      ],
+      "default": "pending",
+      "description": "Human review outcome. Pending means no person has looked at it yet."
+    },
+    "reviewed_by": {
+      "type": "string",
+      "default": "",
+      "description": "Email of the operator who reviewed this item"
+    },
+    "review_note": {
+      "type": "string",
+      "default": "",
+      "description": "Reviewer's reasoning"
+    },
+    "checker_error": {
+      "type": "string",
+      "default": "",
+      "description": "Set if the grounding checker itself failed, so an unchecked response is never displayed as a clean one"
+    }
+  },
+  "required": [
+    "agent_id"
+  ]
+}

@@ -10,6 +10,8 @@
         "ADMISSION_PASS",
         "ADMISSION_DENIED",
         "RATE_LIMIT_EXCEEDED",
+        "TOKEN_BUDGET_EXCEEDED",
+        "TOKEN_SPEND",
         "LOOP_BREAKER_TRIPPED",
         "TOOL_GATE_PASS",
         "TOOL_GATE_DENIED",
@@ -19,6 +21,9 @@
         "CACHE_STORE",
         "OUTPUT_ATTRIBUTED",
         "OUTPUT_SIGNED",
+        "GROUNDING_PASS",
+        "GROUNDING_FAILED",
+        "GROUNDING_NOT_CHECKED",
         "EGRESS_ALLOWED",
         "EGRESS_BLOCKED",
         "DRIFT_DETECTED",
@@ -28,6 +33,8 @@
         "AGENT_REINSTATED",
         "KILL_ALL_ENGAGED",
         "KILL_ALL_RELEASED",
+        "CHAIN_VERIFIED",
+        "CHAIN_BROKEN",
         "PIPELINE_COMPLETE"
       ],
       "description": "Type of audit event"
@@ -45,6 +52,26 @@
       "type": "string",
       "default": "",
       "description": "Unique 256-bit CSPRNG nonce for this event"
+    },
+    "seq": {
+      "type": "number",
+      "default": 0,
+      "description": "Position of this event in the hash chain. Gaps prove a deletion."
+    },
+    "prev_hash": {
+      "type": "string",
+      "default": "",
+      "description": "row_hash of the preceding chain entry. The genesis row uses 64 zeros."
+    },
+    "row_hash": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 over this row's own facts plus prev_hash. Editing any recorded fact changes this hash and breaks every link after it, so tampering is detectable even though the table itself is still writable."
+    },
+    "chain_signature": {
+      "type": "string",
+      "default": "",
+      "description": "HMAC-SHA256 of row_hash under the harness signing secret. Because the client never holds that secret, a forged row cannot be given a valid signature even by someone who can write to this table."
     },
     "output_hash": {
       "type": "string",
@@ -71,6 +98,11 @@
       "default": "",
       "description": "Human-readable event details for forensics"
     },
+    "tokens_total": {
+      "type": "number",
+      "default": 0,
+      "description": "Estimated tokens attributable to this event, when it spent any"
+    },
     "drift_signal": {
       "type": "boolean",
       "default": false,
@@ -84,7 +116,9 @@
         "freeze",
         "revoke",
         "rate_limited",
-        "kill_all"
+        "kill_all",
+        "budget_exhausted",
+        "output_withheld"
       ],
       "default": "",
       "description": "What enforcement action the harness actually took as a result of this event"

@@ -15,6 +15,9 @@ import OutputAttributionLookup from '@/components/OutputAttributionLookup';
 import KillSwitchPanel from '@/components/KillSwitchPanel';
 import AgentKeyPolicyPanel from '@/components/AgentKeyPolicyPanel';
 import EgressAllowlistPanel from '@/components/EgressAllowlistPanel';
+import TokenBudgetPanel from '@/components/TokenBudgetPanel';
+import AuditChainPanel from '@/components/AuditChainPanel';
+import GroundingReviewPanel from '@/components/GroundingReviewPanel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -175,6 +178,11 @@ export default function Home() {
           halted_at: result.haltedAt || '',
           halt_reason: result.status === 'HALTED' ? result.message : '',
           cache_hit: result.cacheHit || false,
+          tokens_spent: result.tokensSpent || 0,
+          judge_tokens: result.judgeTokens || 0,
+          grounding_verdict: result.grounding?.verdict || '',
+          unsupported_claims: result.grounding?.unsupportedCount || 0,
+          output_withheld: !!result.outputWithheld,
           drift_detected: result.driftDetected || false,
           drift_nonce: result.driftNonce || '',
           session_nonce: result.sessionNonce || '',
@@ -394,7 +402,7 @@ export default function Home() {
               {llmEnabled && (
                 <p className="text-xs text-indigo-500 flex items-center gap-1.5 justify-center">
                   <Sparkles className="w-3 h-3" />
-                  LLM-backed stages on: semantic dedup and knowledge retrieval each make their own model call, so a halted run still costs something.
+                  LLM-backed stages on: dedup makes its own model call, and drift + grounding share one judge call. So a run costs two to three model calls, all charged to this agent's token budget.
                 </p>
               )}
             </div>
@@ -425,7 +433,8 @@ export default function Home() {
                     ...(llmEnabled ? [{ step: 7, gate: 'RAG — Context Retrieval' }] : []),
                     ...(llmEnabled ? [{ step: 8, gate: 'LLM — Processing' }] : []),
                     ...(llmEnabled ? [{ step: 9, gate: 'Tripwire — Drift Detection' }] : []),
-                    ...(llmEnabled ? [{ step: 10, gate: 'Cache Store — Response Memoization' }] : []),
+                    ...(llmEnabled ? [{ step: 10, gate: 'Grounding — Cite or Admit' }] : []),
+                    ...(llmEnabled ? [{ step: 11, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
@@ -550,6 +559,20 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Token budget + grounding review — the two newest enforcement surfaces */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <TokenBudgetPanel />
+          </div>
+          <div className="bg-white rounded-xl border border-slate-100 p-5">
+            <AuditChainPanel />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <GroundingReviewPanel />
         </div>
 
         {/* Kill switch + enforcement policy */}
