@@ -1,5 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { detectSemanticDrift, generateNonce, DRIFT_THRESHOLD } from '../../shared/semanticDrift.ts';
+import { loadPolicy } from '../../shared/harnessPolicy.ts';
+import { escalateOnDrift } from '../../shared/enforcement.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -45,22 +47,28 @@ export default async function(req: Request): Promise<Response> {
         action: action || '',
         details: `Semantic drift score ${result.maxScore.toFixed(2)} >= threshold ${result.threshold} on decoy "${topDecoy?.decoyId}" (${topDecoy?.kind}). Judge reason: ${topDecoy?.reason}`,
         drift_signal: true,
+        enforcement: 'none',
+        server_enforced: true,
         halted_at: 'Tripwire',
       });
 
-      // SOFT HALT — freeze pending review, not revoke. Reversible by an operator.
-      const agents = await base44.asServiceRole.entities.AgentIdentity.filter({ agent_id: agentId || '' });
-      if (agents.length > 0) {
-        const agent = agents[0] as any;
-        await base44.asServiceRole.entities.AgentIdentity.update(agent.id, {
-          drift_count: (agent.drift_count || 0) + 1,
-          last_drift_nonce: nonce,
-          status: 'frozen',
-          revoked_reason: `Soft halt — drift score ${result.maxScore.toFixed(2)} on "${topDecoy?.decoyId}". Pending human review.`,
-        });
-      }
+      // KILL SWITCH with escalation: first trip freezes (reversible), the strike
+      // limit revokes. Decided and applied server-side, so tripping the wire
+      // actually stops the agent rather than only reporting on it.
+      const policy = await loadPolicy(base44.asServiceRole);
+      const agents = await base44.asServiceRole.entities.AgentIdentity.filter({ agent_id: agentId || '' }, '-created_date', 1);
+      const escalation = await escalateOnDrift(
+        base44.asServiceRole,
+        agents.length > 0 ? (agents[0] as any) : null,
+        policy,
+        { score: result.maxScore, decoyId: topDecoy?.decoyId || 'unknown', nonce },
+      );
 
       return Response.json({
+        enforcement: escalation.enforcement,
+        strikes: escalation.strikes,
+        strikeLimit: policy.drift_strikes_before_revoke,
+        enforcementMessage: escalation.message,
         drift: true,
         score: result.maxScore,
         threshold: result.threshold,
@@ -70,8 +78,8 @@ export default async function(req: Request): Promise<Response> {
         keywordMatchedTerms: result.keywordMatchedTerms,
         detectorError: result.detectorError,
         nonce,
-        haltType: 'soft',
-        message: `Drift detected: score ${result.maxScore.toFixed(2)} on decoy "${topDecoy?.decoyId}". Agent soft-halted (frozen) pending review.`,
+        haltType: escalation.enforcement === 'revoke' ? 'hard' : 'soft',
+        message: `Drift detected: score ${result.maxScore.toFixed(2)} on decoy "${topDecoy?.decoyId}". ${escalation.message}`,
       });
     }
 

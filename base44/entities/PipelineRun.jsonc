@@ -41,8 +41,11 @@
     "halted_at": {
       "type": "string",
       "enum": [
+        "Kill Switch",
+        "Admission",
         "Identity",
         "Tool Gate",
+        "Rate Limit",
         "Base 2",
         "Base 3",
         "Base 10",
@@ -60,6 +63,19 @@
       "type": "string",
       "default": "",
       "description": "Why the pipeline was halted"
+    },
+    "enforcement": {
+      "type": "string",
+      "enum": [
+        "",
+        "none",
+        "freeze",
+        "revoke",
+        "rate_limited",
+        "kill_all"
+      ],
+      "default": "",
+      "description": "What the harness did to the agent as a result of this run"
     },
     "cache_hit": {
       "type": "boolean",
@@ -98,7 +114,7 @@
     "output_hash": {
       "type": "string",
       "default": "",
-      "description": "SHA-256 of the exact output text. Binds this output to the agent and session that produced it, so a text found later can be traced back to its origin."
+      "description": "SHA-256 of the exact output text. Binds this output to the agent and session that produced it."
     },
     "drift_detected": {
       "type": "boolean",

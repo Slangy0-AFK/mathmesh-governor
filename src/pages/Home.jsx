@@ -12,6 +12,7 @@ import HonestNotice from '@/components/HonestNotice';
 import DriftEvaluationPanel from '@/components/DriftEvaluationPanel';
 import ReviewScorecard from '@/components/ReviewScorecard';
 import OutputAttributionLookup from '@/components/OutputAttributionLookup';
+import KillSwitchPanel from '@/components/KillSwitchPanel';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -178,6 +179,7 @@ export default function Home() {
           rag_sources: result.ragSources || [],
           llm_response: result.llmResponse || '',
           output_hash: result.outputHash || '',
+          enforcement: result.enforcement || '',
           tokens_saved_estimate: result.estimatedTokensSaved || 0,
           compression_saved_chars: result.compressionSaved || 0,
           gate_details: result.steps || [],
@@ -391,18 +393,16 @@ export default function Home() {
                   ))
                 ) : (
                   [
-                    { step: 1, gate: 'Identity — Verify Agent' },
-                    { step: 2, gate: 'Tool Gate — Action Allowlist' },
-                    { step: 3, gate: 'Base 2 — Noise Stripper' },
-                    { step: 4, gate: 'Base 10 — Matrix Voting' },
-                    ...(llmEnabled ? [{ step: 5, gate: 'Base 12 — Semantic Dedup' }] : []),
-                    { step: 6, gate: 'Base 60 — Circuit Breaker' },
-                    { step: 7, gate: 'Base 3 — Prompt Compression' },
-                    ...(llmEnabled ? [{ step: 8, gate: 'Cache Check — Response Memoization' }] : []),
-                    ...(llmEnabled ? [{ step: 9, gate: 'RAG — Context Retrieval' }] : []),
-                    ...(llmEnabled ? [{ step: 10, gate: 'LLM — Processing' }] : []),
-                    ...(llmEnabled ? [{ step: 11, gate: 'Tripwire — Drift Detection' }] : []),
-                    ...(llmEnabled ? [{ step: 12, gate: 'Cache Store — Response Memoization' }] : []),
+                    { step: 1, gate: 'Admission Control (server)' },
+                    { step: 2, gate: 'Base 2 — Noise Stripper' },
+                    { step: 3, gate: 'Base 10 — Matrix Voting' },
+                    ...(llmEnabled ? [{ step: 4, gate: 'Base 12 — Semantic Dedup' }] : []),
+                    { step: 5, gate: 'Base 3 — Prompt Compression' },
+                    ...(llmEnabled ? [{ step: 6, gate: 'Cache Check — Response Memoization' }] : []),
+                    ...(llmEnabled ? [{ step: 7, gate: 'RAG — Context Retrieval' }] : []),
+                    ...(llmEnabled ? [{ step: 8, gate: 'LLM — Processing' }] : []),
+                    ...(llmEnabled ? [{ step: 9, gate: 'Tripwire — Drift Detection' }] : []),
+                    ...(llmEnabled ? [{ step: 10, gate: 'Cache Store — Response Memoization' }] : []),
                   ].map(({ step, gate }) => (
                     <PipelineStepCard
                       key={step}
@@ -527,6 +527,11 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Kill switch + enforcement policy */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <KillSwitchPanel onChange={loadHistory} />
         </div>
 
         {/* Output attribution */}

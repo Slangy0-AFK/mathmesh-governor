@@ -1,0 +1,54 @@
+{
+  "name": "HarnessControl",
+  "type": "object",
+  "properties": {
+    "singleton_key": {
+      "type": "string",
+      "default": "GLOBAL",
+      "description": "Always 'GLOBAL'. There is one control record for the whole harness."
+    },
+    "kill_all": {
+      "type": "boolean",
+      "default": false,
+      "description": "Global emergency stop. When true, admission control denies every agent request before any model spend."
+    },
+    "kill_all_reason": {
+      "type": "string",
+      "default": "",
+      "description": "Why the global stop was engaged"
+    },
+    "kill_all_engaged_by": {
+      "type": "string",
+      "default": "",
+      "description": "Email of the operator who engaged the global stop"
+    },
+    "max_runs_per_window": {
+      "type": "number",
+      "default": 20,
+      "description": "Maximum admitted requests per agent per window. Bounds runaway loops and cost."
+    },
+    "window_seconds": {
+      "type": "number",
+      "default": 60,
+      "description": "Rate limit window length in seconds"
+    },
+    "loop_repeat_limit": {
+      "type": "number",
+      "default": 3,
+      "description": "How many consecutive identical actions trip the circuit breaker"
+    },
+    "drift_strikes_before_revoke": {
+      "type": "number",
+      "default": 2,
+      "description": "Drift events an agent may accumulate before the kill switch escalates from freeze to revoke. 1 means revoke on the first trip."
+    },
+    "auto_revoke_on_drift": {
+      "type": "boolean",
+      "default": true,
+      "description": "When true, tripwire drift escalates to a hard revoke once the strike limit is reached. When false, drift only ever freezes."
+    }
+  },
+  "required": [
+    "singleton_key"
+  ]
+}

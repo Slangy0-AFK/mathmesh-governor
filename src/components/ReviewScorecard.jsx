@@ -11,11 +11,14 @@ const ITEMS = [
   { tier: 2, name: 'Randomized, multi-decoy placement', status: 'yes', note: 'Built. 6 decoys of 5 kinds, random subset and order, random placement, at least one innocuous. Corpus rotates but does not regenerate.' },
   { tier: 2, name: 'Output attribution — trace an output to its producer', status: 'yes', note: 'Built. Every output is SHA-256 hashed and bound to the agent and session that produced it, logged as its own audit event and searchable by pasting the text. Unkeyed, so it identifies rather than proves; requires byte-identical text.' },
   { tier: 2, name: 'Cite-or-admit grounding (per-claim verification, review queue)', status: 'no', note: 'Not built. The prompt asks for grounding and RAG sources are recorded, but nothing checks each claim against the knowledge base, and there is no review queue.' },
-  { tier: 2, name: 'Behavioral baseline per agent', status: 'no', note: 'Not built. Only exact-repeat loops are tracked, in browser memory.' },
+  { tier: 2, name: 'Server-enforced gates (client cannot bypass)', status: 'yes', note: 'Built. Identity, lifecycle, tool gate, rate limit and the loop breaker all moved into one admission-control function that runs before any spend, counted from the persisted log. Fails closed if unreachable. Still not authentication — an agent ID is a claim.' },
+  { tier: 2, name: 'Least-privilege by default', status: 'yes', note: 'Built. Unknown agents are auto-registered as readers, not admins, so write and tool actions must be granted explicitly.' },
+  { tier: 2, name: 'Behavioral baseline per agent', status: 'partial', note: 'Counters are now persisted per identity — runs, halts, drift strikes, rate-limit hits, loop trips — and consecutive-repeat detection survives reloads. No statistical baseline or anomaly model yet.' },
   { tier: 3, name: 'Cross-agent consistency checks', status: 'no', note: 'Not built.' },
   { tier: 3, name: 'Canary tokens in the knowledge base', status: 'no', note: 'Not built.' },
-  { tier: 3, name: 'Rate limiting per identity', status: 'no', note: 'Not built. Nothing bounds call volume per agent.' },
-  { tier: 3, name: 'Halt reversibility policy', status: 'partial', note: 'Drift now soft-halts (freeze, reversible via the registry) rather than revoking. No formal criteria or review queue yet.' },
+  { tier: 3, name: 'Rate limiting per identity', status: 'yes', note: 'Built. Configurable requests-per-window per agent, enforced server-side at admission and counted from the audit log. Not a hard quota — simultaneous requests can read a stale count, so treat it as a cost and runaway bound.' },
+  { tier: 3, name: 'Kill switch (per agent and global)', status: 'yes', note: 'Built. Tripping the wire escalates automatically: freeze on the first strike, revoke at the limit. Operators also have a global emergency stop and per-agent revoke/freeze/reinstate, admin-only and fully audited. It stops requests through this harness, not an agent with its own network path.' },
+  { tier: 3, name: 'Halt reversibility policy', status: 'yes', note: 'Built. Freeze is reversible, revoke is terminal until an operator reinstates, escalation threshold is configurable, and reinstatement clears strikes and is logged. Still no formal review queue.' },
   { tier: 3, name: 'Adversarial evaluation', status: 'partial', note: 'The labeled set includes evasion-style and false-positive-bait cases, but no active red-teaming against the live pipeline.' },
 ];
 

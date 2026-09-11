@@ -2,14 +2,9 @@ import { Separator } from '@/components/ui/separator';
 
 const STAGES = [
   {
-    name: 'Identity — Verify Agent',
-    accent: 'text-white',
-    real: 'Looks the agent ID up in a database table and rejects it if the status is revoked or frozen. Unknown IDs are auto-registered as admin, so this attributes requests — it does not authenticate them. Any caller can claim any agent ID.',
-  },
-  {
-    name: 'Tool Gate — Action Allowlist',
-    accent: 'text-white',
-    real: 'Compares the requested action string against the agent\'s allowlist or role defaults. Useful bookkeeping, but it runs in the browser alongside the rest of the pipeline, so it constrains cooperating agents rather than hostile ones.',
+    name: 'Admission Control (server-enforced)',
+    accent: 'text-emerald-300',
+    real: 'One server-side gate that must pass before anything is spent: global emergency stop, identity lookup, lifecycle status (revoked is terminal, frozen is a hold), tool-gate allowlist, per-identity rate limit, and a loop breaker. Unknown agents are registered as readers, not admins, so anything beyond read actions has to be granted deliberately. Limits are counted from the persisted admission log, so they survive a reload and cannot be reset from the browser. If this gate is unreachable the pipeline fails closed. What it still cannot do: prove who the caller is — an agent ID is a claim, not a credential.',
   },
   {
     name: 'Base 2 — Noise Stripper',
@@ -25,11 +20,6 @@ const STAGES = [
     name: 'Base 12 — Semantic Dedup',
     accent: 'text-indigo-300',
     real: 'Asks an LLM whether the current action name is a reworded repeat of recent ones. It catches real rephrased loops, but it costs an LLM call every run — so it only saves money when the call it prevents would have been more expensive than itself.',
-  },
-  {
-    name: 'Base 60 — Circuit Breaker',
-    accent: 'text-white',
-    real: 'Halts when the same action string appears 3 times consecutively for one agent. History lives in browser memory only and is lost on page reload.',
   },
   {
     name: 'Base 3 — Prompt Compression',
@@ -54,7 +44,7 @@ const STAGES = [
   {
     name: 'Tripwire — Drift Detection',
     accent: 'text-rose-300',
-    real: 'Scores how strongly the response engaged each injected decoy, 0 to 1, and halts above a tuned threshold. This is an LLM judging the output, not embedding similarity — no embedding endpoint exists on this platform — so it costs a model call and is non-deterministic. The old keyword result is shown alongside it for comparison but decides nothing. Measured accuracy is in the evaluation panel below; if it has never been run, the detector has no known accuracy. Drift now soft-halts (freeze, reversible), not revoke. The nonce is a standard CSPRNG, not quantum.',
+    real: 'Scores how strongly the response engaged each injected decoy, 0 to 1, and halts above a tuned threshold. This is an LLM judging the output, not embedding similarity — no embedding endpoint exists on this platform — so it costs a model call and is non-deterministic. The old keyword result is shown alongside it for comparison but decides nothing. Measured accuracy is in the evaluation panel below; if it has never been run, the detector has no known accuracy. Tripping the wire now fires the kill switch server-side, with escalation: the first trip freezes the agent, and at the strike limit it is revoked — after which admission control refuses it until an operator reinstates it. The nonce is a standard CSPRNG, not quantum.',
   },
   {
     name: 'Cache Store — Response Memoization',

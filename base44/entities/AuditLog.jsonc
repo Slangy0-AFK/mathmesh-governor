@@ -7,6 +7,10 @@
       "enum": [
         "IDENTITY_VERIFIED",
         "IDENTITY_DENIED",
+        "ADMISSION_PASS",
+        "ADMISSION_DENIED",
+        "RATE_LIMIT_EXCEEDED",
+        "LOOP_BREAKER_TRIPPED",
         "TOOL_GATE_PASS",
         "TOOL_GATE_DENIED",
         "GATE_PASS",
@@ -18,6 +22,9 @@
         "TRIPWIRE_PASS",
         "AGENT_REVOKED",
         "AGENT_FROZEN",
+        "AGENT_REINSTATED",
+        "KILL_ALL_ENGAGED",
+        "KILL_ALL_RELEASED",
         "PIPELINE_COMPLETE"
       ],
       "description": "Type of audit event"
@@ -44,7 +51,7 @@
     "gate": {
       "type": "string",
       "default": "",
-      "description": "Which gate triggered this event (e.g. Base 2, Base 60, Tripwire, Tool Gate)"
+      "description": "Which gate triggered this event (e.g. Admission, Base 2, Tripwire, Kill Switch)"
     },
     "action": {
       "type": "string",
@@ -60,6 +67,24 @@
       "type": "boolean",
       "default": false,
       "description": "True if this event was triggered by a tripwire drift detection"
+    },
+    "enforcement": {
+      "type": "string",
+      "enum": [
+        "",
+        "none",
+        "freeze",
+        "revoke",
+        "rate_limited",
+        "kill_all"
+      ],
+      "default": "",
+      "description": "What enforcement action the harness actually took as a result of this event"
+    },
+    "server_enforced": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this verdict was decided server-side and therefore cannot be bypassed by the caller"
     },
     "halted_at": {
       "type": "string",

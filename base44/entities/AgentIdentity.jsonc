@@ -25,7 +25,7 @@
         "frozen"
       ],
       "default": "active",
-      "description": "Agent lifecycle status. revoked = kill switch activated, frozen = temporary hold"
+      "description": "Agent lifecycle status. revoked = kill switch activated (terminal until an operator reinstates), frozen = reversible hold"
     },
     "allowed_actions": {
       "type": "array",
@@ -53,17 +53,32 @@
     "drift_count": {
       "type": "number",
       "default": 0,
-      "description": "Number of tripwire drift events detected for this agent"
+      "description": "Number of tripwire drift events detected for this agent. Drives kill switch escalation."
     },
     "last_drift_nonce": {
       "type": "string",
       "default": "",
-      "description": "The QRNG nonce from the most recent drift event (for forensic correlation)"
+      "description": "The CSPRNG nonce from the most recent drift event (for forensic correlation)"
+    },
+    "rate_limit_hits": {
+      "type": "number",
+      "default": 0,
+      "description": "How many times this agent was denied by the per-identity rate limiter"
+    },
+    "loop_trips": {
+      "type": "number",
+      "default": 0,
+      "description": "How many times this agent tripped the server-side circuit breaker"
     },
     "revoked_reason": {
       "type": "string",
       "default": "",
       "description": "Why this agent was revoked/frozen (kill switch reason)"
+    },
+    "revoked_at": {
+      "type": "string",
+      "default": "",
+      "description": "ISO timestamp of the most recent revoke or freeze"
     }
   },
   "required": [
