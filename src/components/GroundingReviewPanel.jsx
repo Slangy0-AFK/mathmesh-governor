@@ -14,11 +14,19 @@ export default function GroundingReviewPanel() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState(null);
+  const [error, setError] = useState('');
 
   const load = async () => {
     setLoading(true);
-    setItems(await base44.entities.GroundingReview.list('-created_date', 40));
-    setLoading(false);
+    try {
+      setItems(await base44.entities.GroundingReview.list('-created_date', 40));
+      setError('');
+    } catch (err) {
+      setItems([]);
+      setError('Grounding review data is temporarily unavailable.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -47,6 +55,8 @@ export default function GroundingReviewPanel() {
         knowledge from invention. Failing answers are withheld from the caller and land here.
         The checker is itself a language model, so this queue is where a human is the actual authority.
       </p>
+
+      {error && <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mb-3">{error}</p>}
 
       {items.length === 0 && <p className="text-xs text-slate-400">Nothing checked yet.</p>}
 

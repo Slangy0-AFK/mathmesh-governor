@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Shield, UserCog, Skull, Snowflake, Activity, Loader2, Plus, RefreshCw, KeyRound, KeySquare, Copy } from 'lucide-react';
+import { UserCog, Skull, Snowflake, Activity, Loader2, Plus, RefreshCw, KeyRound, KeySquare, Copy } from 'lucide-react';
 
 const statusConfig = {
   active: { icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Active' },

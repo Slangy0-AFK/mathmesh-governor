@@ -30,3 +30,9 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

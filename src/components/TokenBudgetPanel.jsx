@@ -15,16 +15,25 @@ export default function TokenBudgetPanel() {
   const [rows, setRows] = useState([]);
   const [policy, setPolicy] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = async () => {
     setLoading(true);
-    const [spend, control] = await Promise.all([
-      base44.entities.TokenSpend.list('-created_date', 300),
-      base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1),
-    ]);
-    setRows(spend.filter((r) => r.phase !== 'refunded'));
-    setPolicy(control[0] || null);
-    setLoading(false);
+    try {
+      const [spend, control] = await Promise.all([
+        base44.entities.TokenSpend.list('-created_date', 300),
+        base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1),
+      ]);
+      setRows(spend.filter((r) => r.phase !== 'refunded'));
+      setPolicy(control[0] || null);
+      setError('');
+    } catch (err) {
+      setRows([]);
+      setPolicy(null);
+      setError('Token budget data is temporarily unavailable.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -63,6 +72,8 @@ export default function TokenBudgetPanel() {
         is a chars/4 estimate, because the platform does not report provider usage.
         {policy?.enforce_token_budget === false && ' ENFORCEMENT IS OFF — spend is measured but never denied.'}
       </p>
+
+      {error && <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mb-3">{error}</p>}
 
       <div className="rounded-lg bg-slate-50 px-3 py-2 mb-3">
         <p className="text-xs text-slate-600">
