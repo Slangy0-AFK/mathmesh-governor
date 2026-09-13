@@ -152,7 +152,18 @@ export default function Home() {
     const votes = parseVotes(votesRaw);
 
     try {
-      const result = await governorRef.current.runMeshPipeline(agentId, payload, action, votes, { enableLLM: llmEnabled, agentKey });
+      let runKey = agentKey;
+      if (!runKey) {
+        const identities = await base44.entities.AgentIdentity.filter({ agent_id: agentId }, '-created_date', 1);
+        const identity = identities[0];
+        if (identity && !identity.key_hash) {
+          const keyResponse = await base44.functions.invoke('issueAgentKey', { agentId });
+          runKey = keyResponse.data.key;
+          setAgentKey(runKey);
+        }
+      }
+
+      const result = await governorRef.current.runMeshPipeline(agentId, payload, action, votes, { enableLLM: llmEnabled, agentKey: runKey });
       setLastResult(result);
 
       const logEntry = {
