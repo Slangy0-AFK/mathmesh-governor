@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
-import { CASES, VERSION, scoreAnswer, buildReport } from '../../shared/modelBenchmark.ts';
+import { CASES, VERSION, scoreAnswer, buildReport } from '../../shared/modelBenchmark.js';
 import { prepareConnection, callConnectedModel } from '../../shared/modelConnection.ts';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
 import { reserveTokens } from '../../shared/tokenLedger.ts';

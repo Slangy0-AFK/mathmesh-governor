@@ -12,6 +12,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+mathmesh-benchmark-results.json
 dist
 dist-ssr
 *.local

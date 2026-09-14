@@ -5,6 +5,25 @@ between the caller and the model, and it enforces limits server-side before
 any spend. It does not sandbox the agent. That distinction is the point of
 everything below.
 
+## Test a model directly from GitHub (no site or Base44 account)
+
+Clone this public repository, install dependencies, and run the same six-case reference benchmark used by the app. Testers use their own provider account and key; the key is sent directly from their machine to that provider and is not saved by this project.
+
+```bash
+npm install
+MODEL_PROVIDER=openai MODEL_ID=<model-id> MODEL_API_KEY=<provider-key> npm run test:model
+```
+
+Supported `MODEL_PROVIDER` values are `openai`, `anthropic`, `gemini`, and `compatible`. For an OpenAI-compatible service, also set its trusted HTTPS base URL:
+
+```bash
+MODEL_PROVIDER=compatible MODEL_ID=<model-id> MODEL_API_KEY=<provider-key> MODEL_ENDPOINT=https://provider.example/v1 npm run test:model
+```
+
+The command prints pass/fail/error results and writes full prompts, reference answers, observed outputs, timing, and provider-reported token usage to `mathmesh-benchmark-results.json`. It exits unsuccessfully when any case fails or errors, making fabricated or missing outputs visible rather than counting them as passes.
+
+This is a small public structured-output smoke test, not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
+
 ## Quick start: run it and hook agents up
 
 ### 1) Install and start the app
