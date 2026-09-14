@@ -19,6 +19,7 @@ import TokenBudgetPanel from '@/components/TokenBudgetPanel';
 import AuditChainPanel from '@/components/AuditChainPanel';
 import GroundingReviewPanel from '@/components/GroundingReviewPanel';
 import SelfTestReport from '@/components/SelfTestReport';
+import ExternalModelTest from '@/components/ExternalModelTest';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -302,6 +303,10 @@ export default function Home() {
         </div>
 
         <HonestNotice />
+
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <ExternalModelTest />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
