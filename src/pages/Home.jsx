@@ -578,7 +578,7 @@ export default function Home() {
         </div>
 
         {/* Signed self-test + exportable report */}
-        <div className="bg-white rounded-xl border border-slate-100 p-5">
+        <div id="harness-assessment" className="bg-white rounded-xl border border-slate-100 p-5 scroll-mt-24">
           <SelfTestReport />
         </div>
 

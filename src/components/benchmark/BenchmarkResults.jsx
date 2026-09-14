@@ -1,0 +1,14 @@
+import { Button } from '@/components/ui/button';
+export default function BenchmarkResults({ reports }) {
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(reports, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'mathmesh-benchmark-results.json'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  if (!reports.length) return <p className="text-sm text-muted-foreground">No benchmark results yet. Run models in turn to compare the same fixed suite.</p>;
+  return <div className="space-y-3">
+    <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Model comparison</h3><Button variant="outline" size="sm" onClick={download}>Export results</Button></div>
+    <p className="text-xs text-muted-foreground">Results remain in this page session; export before leaving. Score includes all six cases, including failures and errors. Latency measures successful provider requests only; unknown usage is never zero.</p>
+    <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead><tr className="border-b"><th className="p-2">Model / source</th><th className="p-2">Exact score</th><th className="p-2">Failed / errors</th><th className="p-2">Mean latency</th><th className="p-2">Reported tokens</th></tr></thead><tbody>{reports.map((r, i) => <tr key={i} className="border-b"><td className="p-2">{r.model}<div className="text-xs text-muted-foreground">{r.provider} · {r.version}</div></td><td className="p-2">{r.summary.passed}/{r.summary.total} ({Math.round(r.summary.score * 100)}%)</td><td className="p-2">{r.summary.failed} / {r.summary.errored}</td><td className="p-2">{r.summary.meanLatencyMs === null ? 'Unknown' : `${r.summary.meanLatencyMs} ms`}</td><td className="p-2">{r.summary.providerTokens ?? 'Unknown'}<div className="text-xs">{r.summary.measuredCases}/{r.summary.total} cases reported usage</div></td></tr>)}</tbody></table></div>
+    {reports.map((r, i) => <details key={i} className="rounded-lg border p-3"><summary className="cursor-pointer text-sm font-medium">{r.model} — per-case evidence · {new Date(r.finishedAt).toLocaleString()}</summary><p className="my-2 text-xs text-muted-foreground">{r.limitations}</p>{r.cases.map(c => <div key={c.id} className="border-t py-3 text-sm"><p className="font-medium">{c.name}: {c.passed === null ? 'ERROR / NOT RUN' : c.passed ? 'PASS' : 'FAIL'}</p><p>{c.reason}</p><p className="text-xs text-muted-foreground">Reference: {JSON.stringify({ answer: c.expected })}</p><pre className="whitespace-pre-wrap break-words text-xs my-2">{c.observed || '(no answer)'}</pre><details><summary className="text-xs cursor-pointer">Exact prompt</summary><p className="whitespace-pre-wrap text-xs mt-1">{c.prompt}</p></details></div>)}</details>)}
+  </div>;
+}
