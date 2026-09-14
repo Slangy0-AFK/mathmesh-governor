@@ -5,6 +5,110 @@ between the caller and the model, and it enforces limits server-side before
 any spend. It does not sandbox the agent. That distinction is the point of
 everything below.
 
+## Quick start: run it and hook agents up
+
+### 1) Install and start the app
+
+```bash
+npm install
+npm run dev
+```
+
+If you are running the Base44-managed workflow for the backend, the project
+also supports the Base44 CLI flow, which is the expected path for local app
+and server work in this repo:
+
+```bash
+base44 dev
+```
+
+The app exposes the governance UI in the browser and the server-side guardrails
+run in the Base44 functions under `base44/functions/`.
+
+### 2) Register an agent and issue a key
+
+Open the app and use the Agent Identity Registry in the dashboard:
+
+1. Enter a unique agent ID, such as `Scanner_3` or `ResearchBot`.
+2. Choose a role: `reader`, `writer`, `tool_caller`, or `admin`.
+3. Click Register.
+4. Click Issue Key for that agent.
+5. Copy the one-time key shown by the UI and store it in the agent's runtime
+   config or environment.
+
+That key is the authenticated identity for that agent. The server stores only
+its SHA-256 hash; the plaintext is shown once at issuance.
+
+### 3) Connect an agent to the harness
+
+Any call that goes through the governed pipeline should include:
+
+- `agentId`: the registered identity name
+- `agentKey`: the one-time key issued to that identity
+- `action`: the action being requested
+- `payload`: the user or tool input to process
+
+Example request body for the governed model call:
+
+```json
+{
+  "agentId": "Scanner_3",
+  "agentKey": "<issued-agent-key>",
+  "action": "summarize_report",
+  "payload": "Summarize the latest release notes and flag risks.",
+  "context": "Use this as the grounding source if available."
+}
+```
+
+The server-side admission path checks identity, lifecycle status, kill switch,
+rate limits, tool permissions, and token budget before the model call is allowed.
+If the agent is missing, revoked, frozen, or using the wrong key, the request is
+rejected server-side before spend.
+
+### Direct API example
+
+Once the app is running and the agent is registered, you can test the harness
+with a direct HTTP request. Replace the values below with your own agent ID,
+issued key, and running app URL.
+
+```bash
+curl -X POST http://localhost:5173/api/processWithSonnet \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "Scanner_3",
+    "agentKey": "<issued-agent-key>",
+    "action": "summarize_report",
+    "payload": "Summarize the latest release notes and flag risks.",
+    "context": "Use this as the grounding source if available."
+  }'
+```
+
+If the app is exposed through Base44 or another configured backend route, use
+that URL instead of the local Vite dev server.
+
+### 4) Expected results
+
+When everything is configured correctly, you should see:
+
+- A successful `200` response containing the model result, `outputHash`, and
+  `outputSignature`
+- Recorded audit entries and a pass through the enrollment, budget, and output
+  signing gates
+- A visible run in the app's pipeline log and agent registry
+
+When the agent is misconfigured or blocked, you should expect:
+
+- `403` with `Admission denied...` when the identity is unknown, revoked,
+  frozen, or the wrong key is supplied
+- `429` with a token-budget or rate-limit denial when the identity exceeds its
+  configured limits
+- `HALTED` status in the UI run log when the server stops the request before
+  output is returned
+
+The key rule is simple: if an agent passes through this harness, it must be
+registered, verified, and authorized before it can spend tokens or call guarded
+functions.
+
 ### What is actually enforced
 
 Every request that passes through `processWithSonnet` or `egressProxy` is
