@@ -1,3 +1,7 @@
+## Published App
+
+[Open the live MathMesh Governor app](https://lean-math-mesh.base44.app)
+
 ## Harness Status — Measured, Not Claimed
 
 This is a governance and containment layer for AI agent workflows. It sits
