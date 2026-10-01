@@ -9,11 +9,45 @@ import { test, expect } from '@playwright/test';
  * token budget, global emergency stop, audit-chain verification, egress allowlist,
  * and the grounding review queue.
  *
- * They mutate live data (create/delete probe agents, seed a spend row, and
- * momentarily toggle the global emergency stop), so they are gated behind
- * E2E_AUTH_EMAIL / E2E_AUTH_PASSWORD and skip otherwise. Every probe is prefixed
- * and cleaned up in afterEach.
+ * They mutate data, including a temporary global-stop change. They only run
+ * against an explicitly selected, dedicated test deployment.
  */
+
+const liveEnabled = process.env.E2E_RUN_LIVE === 'true';
+const mutationConfirmed = process.env.E2E_ALLOW_MUTATIONS === 'true';
+const liveConfig = {
+  baseUrl: process.env.E2E_BASE_URL,
+  email: process.env.E2E_AUTH_EMAIL,
+  password: process.env.E2E_AUTH_PASSWORD,
+};
+
+if (liveEnabled) {
+  const missing = [
+    ['E2E_BASE_URL', liveConfig.baseUrl],
+    ['E2E_AUTH_EMAIL', liveConfig.email],
+    ['E2E_AUTH_PASSWORD', liveConfig.password],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length || !mutationConfirmed) {
+    throw new Error(
+      `Live enforcement tests require ${[...missing, ...(!mutationConfirmed ? ['E2E_ALLOW_MUTATIONS=true'] : [])].join(', ')}.`,
+    );
+  }
+
+  let target;
+  try {
+    target = new URL(liveConfig.baseUrl);
+  } catch {
+    throw new Error('E2E_BASE_URL must be an absolute HTTPS URL for a dedicated test deployment.');
+  }
+  if (target.protocol !== 'https:') {
+    throw new Error('Live enforcement tests require an HTTPS test deployment.');
+  }
+  if (target.origin === 'https://lean-math-mesh.base44.app') {
+    throw new Error('Live enforcement tests are blocked against the published production app.');
+  }
+}
 
 const PROBE = 'E2EEnforcementProbe';
 const RATE_PROBE = 'E2ERateProbe';
@@ -22,10 +56,7 @@ const KILL_PROBE = 'E2EKillProbe';
 const UNKNOWN = () => `E2EUnknown_${Date.now()}`;
 
 test.describe('Live backend enforcement', () => {
-  test.skip(
-    !process.env.E2E_AUTH_EMAIL || !process.env.E2E_AUTH_PASSWORD,
-    'Set E2E_AUTH_EMAIL and E2E_AUTH_PASSWORD to run live backend enforcement tests.',
-  );
+  test.skip(!liveEnabled, 'Set E2E_RUN_LIVE=true and explicit test-deployment settings to run live tests.');
 
   let page;
 
@@ -34,12 +65,14 @@ test.describe('Live backend enforcement', () => {
     page = await context.newPage();
     await page.goto(baseURL || '/');
     const exposesClient = await page.evaluate(() => Boolean(window.__base44));
-    test.skip(!exposesClient, 'Live SDK tests require the client to be exposed on window.__base44.');
+    if (!exposesClient) {
+      throw new Error('Enable VITE_E2E_EXPOSE_BASE44=true on the dedicated test deployment to run SDK checks.');
+    }
     const email = page.getByLabel(/email/i).or(page.getByPlaceholder(/email/i)).first();
     const password = page.getByLabel(/password/i).or(page.getByPlaceholder(/password/i)).first();
     await expect(email).toBeVisible({ timeout: 15_000 });
-    await email.fill(process.env.E2E_AUTH_EMAIL);
-    await password.fill(process.env.E2E_AUTH_PASSWORD);
+    await email.fill(liveConfig.email);
+    await password.fill(liveConfig.password);
     await page.getByRole('button', { name: /log ?in|sign ?in/i }).click();
     // The auth flow hard-redirects; wait for the app to reload with an authenticated client.
     await page.waitForFunction(() => !!window.__base44, null, { timeout: 30_000 });
@@ -58,8 +91,8 @@ test.describe('Live backend enforcement', () => {
   const cleanupAgents = (ids) =>
     page.evaluate(async (ids) => {
       for (const id of ids) {
-        const list = await window.__base44.entities.AgentIdentity.filter({ agent_id: id }, '-created_date', 1);
-        if (list[0]) await window.__base44.entities.AgentIdentity.delete(list[0].id);
+        const list = await window.__base44.entities.AgentIdentity.filter({ agent_id: id }, '-created_date', 100);
+        for (const agent of list) await window.__base44.entities.AgentIdentity.delete(agent.id);
       }
     }, ids);
 
@@ -68,7 +101,7 @@ test.describe('Live backend enforcement', () => {
   });
 
   test.afterEach(async () => {
-    await cleanupAgents([PROBE, RATE_PROBE, BUDGET_PROBE, KILL_PROBE]);
+    if (page) await cleanupAgents([PROBE, RATE_PROBE, BUDGET_PROBE, KILL_PROBE]);
   });
 
   test('unknown agent is refused at Identity (not auto-registered)', async () => {
@@ -162,15 +195,19 @@ test.describe('Live backend enforcement', () => {
         session_nonce: '', total_runs: 0, halt_count: 0, drift_count: 0, rate_limit_hits: 0, loop_trips: 0,
       });
       const key = (await window.__base44.functions.invoke('issueAgentKey', { agentId: id })).data.key;
-      const seed = await window.__base44.entities.TokenSpend.create({
-        agent_id: id, action: 'Fetch_Database_Record', session_nonce: '', phase: 'actual',
-        purpose: 'generation', tokens_in: 45000, tokens_out: 0, tokens_total: 45000, estimated: true,
-        note: 'E2E seed to trip the budget gate',
-      });
-      const r = await window.__base44.functions.invoke('admissionControl', { agentId: id, action: 'Fetch_Database_Record', agentKey: key });
-      const d = r.data ?? r;
-      await window.__base44.entities.TokenSpend.delete(seed.id);
-      return { admitted: d.admitted, haltedAt: d.haltedAt };
+      let seed;
+      try {
+        seed = await window.__base44.entities.TokenSpend.create({
+          agent_id: id, action: 'Fetch_Database_Record', session_nonce: '', phase: 'actual',
+          purpose: 'generation', tokens_in: 45000, tokens_out: 0, tokens_total: 45000, estimated: true,
+          note: 'E2E seed to trip the budget gate',
+        });
+        const r = await window.__base44.functions.invoke('admissionControl', { agentId: id, action: 'Fetch_Database_Record', agentKey: key });
+        const d = r.data ?? r;
+        return { admitted: d.admitted, haltedAt: d.haltedAt };
+      } finally {
+        if (seed) await window.__base44.entities.TokenSpend.delete(seed.id);
+      }
     }, BUDGET_PROBE);
     expect(result.admitted).toBe(false);
     expect(result.haltedAt).toBe('Token Budget');
@@ -184,12 +221,24 @@ test.describe('Live backend enforcement', () => {
       });
       const key = (await window.__base44.functions.invoke('issueAgentKey', { agentId: id })).data.key;
       const ctrl = (await window.__base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1))[0];
-      const prevReason = ctrl.kill_all_reason;
-      await window.__base44.entities.HarnessControl.update(ctrl.id, { kill_all: true, kill_all_reason: 'E2E probe (momentary)', kill_all_engaged_by: 'e2e' });
-      const r = await window.__base44.functions.invoke('admissionControl', { agentId: id, action: 'Fetch_Database_Record', agentKey: key });
-      const d = r.data ?? r;
-      await window.__base44.entities.HarnessControl.update(ctrl.id, { kill_all: false, kill_all_reason: prevReason || '', kill_all_engaged_by: '' });
-      return { admitted: d.admitted, haltedAt: d.haltedAt };
+      if (!ctrl) throw new Error('Global harness control record is missing.');
+      const previous = {
+        kill_all: ctrl.kill_all,
+        kill_all_reason: ctrl.kill_all_reason || '',
+        kill_all_engaged_by: ctrl.kill_all_engaged_by || '',
+      };
+      try {
+        await window.__base44.entities.HarnessControl.update(ctrl.id, {
+          kill_all: true,
+          kill_all_reason: 'E2E probe (momentary)',
+          kill_all_engaged_by: 'e2e',
+        });
+        const r = await window.__base44.functions.invoke('admissionControl', { agentId: id, action: 'Fetch_Database_Record', agentKey: key });
+        const d = r.data ?? r;
+        return { admitted: d.admitted, haltedAt: d.haltedAt };
+      } finally {
+        await window.__base44.entities.HarnessControl.update(ctrl.id, previous);
+      }
     }, KILL_PROBE);
     expect(result.admitted).toBe(false);
     expect(result.haltedAt).toBe('Kill Switch');
@@ -227,33 +276,25 @@ test.describe('Live backend enforcement', () => {
   test('grounding review queue supports human review (answer review)', async () => {
     const result = await page.evaluate(async (id) => {
       const me = await window.__base44.auth.me();
-      const rec = await window.__base44.entities.GroundingReview.create({
-        agent_id: id, action: 'E2E_Review_Test', session_nonce: '', output_hash: 'e2e'.repeat(16),
-        response_text: 'E2E probe response', context_provided: true, verdict: 'ungrounded',
-        claims: [{ claim: 'probe claim', supported: false, citation: '', reason: 'e2e' }],
-        unsupported_count: 1, total_claims: 1, blocked: true, status: 'pending',
-        reviewed_by: '', review_note: '', checker_error: '',
-      });
-      await window.__base44.entities.GroundingReview.update(rec.id, { status: 'approved', reviewed_by: me?.email || 'e2e@test' });
-      const list = await window.__base44.entities.GroundingReview.filter({ id: rec.id }, '-created_date', 1);
-      const updated = list[0];
-      await window.__base44.entities.GroundingReview.delete(rec.id);
-      return { status: updated?.status };
+      let rec;
+      try {
+        rec = await window.__base44.entities.GroundingReview.create({
+          agent_id: id, action: 'E2E_Review_Test', session_nonce: '', output_hash: 'e2e'.repeat(16),
+          response_text: 'E2E probe response', context_provided: true, verdict: 'ungrounded',
+          claims: [{ claim: 'probe claim', supported: false, citation: '', reason: 'e2e' }],
+          unsupported_count: 1, total_claims: 1, blocked: true, status: 'pending',
+          reviewed_by: '', review_note: '', checker_error: '',
+        });
+        await window.__base44.entities.GroundingReview.update(rec.id, { status: 'approved', reviewed_by: me?.email || 'e2e@test' });
+        const list = await window.__base44.entities.GroundingReview.filter({ id: rec.id }, '-created_date', 1);
+        return { status: list[0]?.status };
+      } finally {
+        if (rec) await window.__base44.entities.GroundingReview.delete(rec.id);
+      }
     }, PROBE);
     expect(result.status).toBe('approved');
   });
 });
-
-const liveEnabled = process.env.E2E_RUN_LIVE === 'true';
-const credentialsConfigured = Boolean(
-  process.env.E2E_AUTH_EMAIL &&
-  process.env.E2E_AUTH_PASSWORD &&
-  process.env.E2E_BASE_URL
-);
-
-if (liveEnabled && !credentialsConfigured) {
-  throw new Error('Live enforcement tests require E2E_AUTH_EMAIL, E2E_AUTH_PASSWORD, and E2E_BASE_URL.');
-}
 
 async function signInAsAdmin(page) {
   await page.goto('/');
@@ -261,7 +302,7 @@ async function signInAsAdmin(page) {
   const email = page.getByLabel(/email/i).first();
   if (await email.isVisible().catch(() => false)) {
     await email.fill(process.env.E2E_AUTH_EMAIL);
-    await page.getByLabel(/password/i).first().fill(process.env.E2E_AUTH_PASSWORD);
+    await page.getByLabel(/password/i).first().fill(liveConfig.password);
     await page.getByRole('button', { name: /log ?in|sign ?in/i }).click();
   }
 
@@ -269,7 +310,7 @@ async function signInAsAdmin(page) {
 }
 
 test.describe('Live enforcement checks', () => {
-  test.skip(!credentialsConfigured, 'Configure E2E credentials and E2E_BASE_URL to run against a test deployment.');
+  test.skip(!liveEnabled, 'Set E2E_RUN_LIVE=true and explicit test-deployment settings to run live tests.');
 
   test.beforeEach(async ({ page }) => {
     await signInAsAdmin(page);

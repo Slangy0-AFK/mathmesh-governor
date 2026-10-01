@@ -62,18 +62,32 @@ This is a small author-written public structured-output smoke test (ten cases), 
 
 ## Live backend enforcement tests
 
-The browser smoke tests only check that pages load. The enforcement suite
-verifies the actual controls against the deployed backend: unknown agents,
-wrong keys, frozen and revoked agents, disallowed actions, the rate limit,
-token-budget exhaustion, the global emergency stop, audit-chain verification,
-the egress allowlist, and the grounding review queue. It runs through the
-app's own authenticated SDK and cleans up its probe data afterwards.
+The enforcement suite contains 11 backend checks and two UI checks. It covers
+unknown and incorrectly keyed agents, frozen and revoked agents, action
+permissions, request limits, estimated-token exhaustion, the global emergency
+stop, denied-request spend, audit-verification response shape, egress policy,
+human review, and the signed self-test. Browser smoke tests separately check
+that pages load; they do not verify live backend controls.
+
+These tests create and delete probe data, add a temporary spend record, and
+momentarily change the global emergency stop. Run them only against a dedicated
+HTTPS test deployment with synthetic data. The published production URL is
+blocked. The SDK-backed checks require that deployment to be built with
+`VITE_E2E_EXPOSE_BASE44=true`; keep that setting off in production.
 
 ```bash
-E2E_AUTH_EMAIL=<admin-email> E2E_AUTH_PASSWORD=<password> npm run test:e2e:enforcement
+export E2E_RUN_LIVE=true
+export E2E_ALLOW_MUTATIONS=true
+export E2E_BASE_URL="https://your-dedicated-test-deployment.example"
+export E2E_AUTH_EMAIL="your-test-admin@example.com"
+export E2E_AUTH_PASSWORD="your-test-password"
+npm run test:e2e:enforcement
 ```
 
-It skips automatically when those credentials are not set.
+Without `E2E_RUN_LIVE=true`, the live tests are skipped. Live mode fails fast if
+the target, credentials, or mutation confirmation are missing. The signed
+self-test makes model calls and may incur provider charges. Review the generated
+Playwright report and probe-data cleanup before accepting a run.
 
 ## Quick start: run it and hook agents up
 

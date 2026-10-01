@@ -13,9 +13,7 @@ export const base44 = createClient({
   appBaseUrl
 });
 
-// Expose the authenticated client for live backend tests. Harmless in production:
-// it is the same client the app already uses, and lets the e2e suite call the
-// deployed functions through the app's own authenticated SDK.
-if (typeof window !== 'undefined') {
+// Expose the SDK only in an explicitly configured evaluation deployment.
+if (typeof window !== 'undefined' && import.meta.env.VITE_E2E_EXPOSE_BASE44 === 'true') {
   window.__base44 = base44;
 }
