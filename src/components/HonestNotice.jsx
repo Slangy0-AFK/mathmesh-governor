@@ -29,9 +29,11 @@ export default function HonestNotice() {
             security boundary against a hostile caller — that would need to live server-side.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Most importantly: this detects, it does not contain. There is no sandbox and no egress
-            filtering behind it, so a halt withholds a result rather than stopping an agent from
-            acting. The scorecard further down lists every requirement that is still missing.
+            Most importantly: this detects, it does not contain. There is no sandbox, so a halt
+            withholds a result rather than stopping an agent from acting. The controls here do not
+            govern anything an agent does outside this app — an agent with its own network route or
+            runtime is unaffected, because isolation would have to live below the app layer. The
+            scorecard further down lists every requirement that is still missing.
           </p>
         </div>
       </div>

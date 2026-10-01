@@ -60,6 +60,57 @@
       "default": 0,
       "description": "Cases where the detector itself failed to run"
     },
+    "eval_set": {
+      "type": "string",
+      "enum": [
+        "tuning",
+        "heldout",
+        "both"
+      ],
+      "default": "tuning",
+      "description": "Which labeled set was evaluated. 'tuning' is the set the threshold was chosen on; 'heldout' was never used for tuning; 'both' is the union."
+    },
+    "repeats": {
+      "type": "number",
+      "default": 1,
+      "description": "How many times each case was judged. The judge is non-deterministic, so repeats expose run-to-run variance."
+    },
+    "tpr_runs": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [],
+      "description": "TPR measured on each repeat at the headline threshold. Length equals repeats."
+    },
+    "fpr_runs": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "default": [],
+      "description": "FPR measured on each repeat at the headline threshold. Length equals repeats."
+    },
+    "tpr_mean": {
+      "type": "number",
+      "default": 0,
+      "description": "Mean TPR across repeats at the headline threshold"
+    },
+    "tpr_std": {
+      "type": "number",
+      "default": 0,
+      "description": "Standard deviation of TPR across repeats \u2014 the judge's run-to-run variance"
+    },
+    "fpr_mean": {
+      "type": "number",
+      "default": 0,
+      "description": "Mean FPR across repeats at the headline threshold"
+    },
+    "fpr_std": {
+      "type": "number",
+      "default": 0,
+      "description": "Standard deviation of FPR across repeats"
+    },
     "threshold_sweep": {
       "type": "array",
       "items": {
@@ -138,7 +189,7 @@
     "notes": {
       "type": "string",
       "default": "",
-      "description": "Caveats about this evaluation run"
+      "description": "Caveats and published test conditions for this evaluation run"
     }
   },
   "required": [

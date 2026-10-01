@@ -69,7 +69,8 @@ export default function TokenBudgetPanel() {
       <p className="text-xs text-slate-500 leading-relaxed mb-3">
         Spend is bounded in estimated tokens per agent, not in requests — twenty long requests cost
         far more than twenty short ones, so a request cap never bounded exhaustion. Every number here
-        is a chars/4 estimate, because the platform does not report provider usage.
+        is a chars/4 estimate, because the platform does not report provider usage. These are
+        estimated limits, not a provider bill — treat them as a budget unit, not a charge.
         {policy?.enforce_token_budget === false && ' ENFORCEMENT IS OFF — spend is measured but never denied.'}
       </p>
 

@@ -8,6 +8,7 @@ import KnowledgeBaseManager from '@/components/KnowledgeBaseManager';
 import AgentIdentityManager from '@/components/AgentIdentityManager';
 import AuditLogViewer from '@/components/AuditLogViewer';
 import HowItWorksPanel from '@/components/HowItWorksPanel';
+import OperationsPanel from '@/components/OperationsPanel';
 import HonestNotice from '@/components/HonestNotice';
 import DriftEvaluationPanel from '@/components/DriftEvaluationPanel';
 import ReviewScorecard from '@/components/ReviewScorecard';
@@ -332,6 +333,14 @@ export default function Home() {
             {/* Input form */}
             <div className="bg-white rounded-xl border border-slate-100 p-5 space-y-4">
               <p className="text-sm font-semibold text-slate-700">Pipeline Input</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Plain-language terms: <span className="font-medium text-slate-500">Raw Payload</span> is the
+                text the agent wants processed. <span className="font-medium text-slate-500">Vote Array</span>{' '}
+                is a list of numbers the agents use to signal agreement (here, checked for all-even or all-odd
+                parity). <span className="font-medium text-slate-500">Drift</span> means the model wandered off
+                your task and followed an injected decoy instead. <span className="font-medium text-slate-500">RAG</span>{' '}
+                means retrieval — pulling relevant facts from the knowledge base to ground the answer.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -376,6 +385,7 @@ export default function Home() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-600">Raw Payload</Label>
+                <p className="text-xs text-slate-400">The text the agent wants the model to process.</p>
                 <Textarea
                   value={payload}
                   onChange={e => setPayload(e.target.value)}
@@ -389,6 +399,10 @@ export default function Home() {
                 <Label className="text-xs font-medium text-slate-600">
                   Vote Array <span className="text-slate-400 font-normal">(comma-separated integers)</span>
                 </Label>
+                <p className="text-xs text-slate-400">
+                  Numbers agents use to signal agreement. The pipeline checks their parity (all-even or
+                  all-odd), so this only means something if your agents encode agreement that way.
+                </p>
                 <Input
                   value={votesRaw}
                   onChange={e => setVotesRaw(e.target.value)}
@@ -642,6 +656,11 @@ export default function Home() {
         {/* Audit Log */}
         <div className="bg-white rounded-xl border border-slate-100 p-5">
           <AuditLogViewer />
+        </div>
+
+        {/* Operations */}
+        <div className="bg-white rounded-xl border border-slate-100 p-5">
+          <OperationsPanel />
         </div>
       </div>
     </div>

@@ -3,11 +3,19 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Loader2, Target, RefreshCw, AlertTriangle } from 'lucide-react';
 
+const SETS = [
+  { value: 'tuning', label: 'Tuning set (24)' },
+  { value: 'heldout', label: 'Held-out set (12)' },
+  { value: 'both', label: 'All (36)' },
+];
+
 export default function DriftEvaluationPanel() {
   const [latest, setLatest] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [evalSet, setEvalSet] = useState('heldout');
+  const [repeats, setRepeats] = useState(1);
 
   useEffect(() => { load(); }, []);
 
@@ -25,7 +33,7 @@ export default function DriftEvaluationPanel() {
     setIsRunning(true);
     setError('');
     try {
-      await base44.functions.invoke('runDriftEval', {});
+      await base44.functions.invoke('runDriftEval', { set: evalSet, repeats: Number(repeats) });
       await load();
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Evaluation failed.');
@@ -34,6 +42,7 @@ export default function DriftEvaluationPanel() {
   };
 
   const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  const fmt = (v) => (typeof v === 'number' ? v.toFixed(3) : '—');
 
   return (
     <div>
@@ -51,11 +60,40 @@ export default function DriftEvaluationPanel() {
           {isRunning ? 'Running…' : 'Run Evaluation'}
         </Button>
       </div>
-      <p className="text-xs text-slate-500 leading-relaxed mb-4">
-        Runs the semantic detector against a hand-labeled set and reports true and false positive
-        rates separately, alongside the old keyword detector on the identical set. Admin only — one
-        model call per case.
+      <p className="text-xs text-slate-500 leading-relaxed mb-3">
+        Runs the semantic detector against a labeled set and reports true and false positive rates
+        separately, alongside the old keyword detector on the identical set. Admin only — one model
+        call per case per repeat.
       </p>
+
+      {/* Controls: which set, how many repeats */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500">Set</span>
+          <select
+            value={evalSet}
+            onChange={(e) => setEvalSet(e.target.value)}
+            disabled={isRunning}
+            className="text-xs h-8 rounded-md border border-slate-200 bg-white px-2 text-slate-700"
+          >
+            {SETS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500">Repeats</span>
+          <select
+            value={repeats}
+            onChange={(e) => setRepeats(e.target.value)}
+            disabled={isRunning}
+            className="text-xs h-8 rounded-md border border-slate-200 bg-white px-2 text-slate-700"
+          >
+            {[1, 2, 3, 5].map((n) => <option key={n} value={n}>{n}×</option>)}
+          </select>
+        </div>
+        <span className="text-xs text-slate-400">
+          The judge is non-deterministic; repeats expose run-to-run variance as a mean ± std.
+        </span>
+      </div>
 
       {error && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3">{error}</p>
@@ -72,12 +110,55 @@ export default function DriftEvaluationPanel() {
         </p>
       ) : (
         <div className="space-y-4">
+          {/* Set + repeats badge */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            {latest.eval_set && (
+              <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                {latest.eval_set === 'heldout' ? 'held-out' : latest.eval_set === 'both' ? 'all cases' : 'tuning'} set
+              </span>
+            )}
+            {latest.repeats > 1 && (
+              <span className="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+                {latest.repeats}× repeats
+              </span>
+            )}
+            {latest.eval_set === 'tuning' && (
+              <span className="text-amber-600">
+                Tuning numbers are overfit — the threshold was chosen on these cases. Run the held-out set.
+              </span>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Metric label="TPR (drift caught)" value={pct(latest.tpr)} tone="text-emerald-600" />
-            <Metric label="FPR (false alarms)" value={pct(latest.fpr)} tone="text-red-500" />
+            <Metric
+              label={`TPR (drift caught)${latest.repeats > 1 ? ' · mean' : ''}`}
+              value={pct(latest.tpr_mean ?? latest.tpr)}
+              tone="text-emerald-600"
+              sub={latest.repeats > 1 ? `± ${fmt(latest.tpr_std)}` : null}
+            />
+            <Metric
+              label={`FPR (false alarms)${latest.repeats > 1 ? ' · mean' : ''}`}
+              value={pct(latest.fpr_mean ?? latest.fpr)}
+              tone="text-red-500"
+              sub={latest.repeats > 1 ? `± ${fmt(latest.fpr_std)}` : null}
+            />
             <Metric label="Threshold" value={String(latest.threshold)} tone="text-slate-700" />
             <Metric label="Labeled cases" value={String(latest.total_cases)} tone="text-slate-700" />
           </div>
+
+          {/* Per-run variance */}
+          {latest.tpr_runs?.length > 1 && (
+            <div className="bg-slate-50 rounded-lg p-3">
+              <p className="text-xs font-semibold text-slate-600 mb-2">Per-repeat rates (run-to-run variance)</p>
+              <div className="flex flex-wrap gap-2">
+                {latest.tpr_runs.map((t, i) => (
+                  <span key={i} className="text-xs bg-white border border-slate-200 rounded px-2 py-1 font-mono text-slate-600">
+                    run {i + 1}: TPR {pct(t)} · FPR {pct(latest.fpr_runs[i])}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-50 rounded-lg p-3">
             <p className="text-xs font-semibold text-slate-600 mb-2">
@@ -109,7 +190,7 @@ export default function DriftEvaluationPanel() {
 
           {latest.threshold_sweep?.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-slate-600 mb-2">Threshold sweep</p>
+              <p className="text-xs font-semibold text-slate-600 mb-2">Threshold sweep (first repeat)</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -176,11 +257,12 @@ export default function DriftEvaluationPanel() {
   );
 }
 
-function Metric({ label, value, tone }) {
+function Metric({ label, value, tone, sub }) {
   return (
     <div className="bg-slate-50 rounded-lg px-3 py-2.5">
       <p className="text-xs text-slate-400">{label}</p>
       <p className={`text-lg font-bold ${tone}`}>{value}</p>
+      {sub && <p className="text-xs text-slate-400 font-mono">{sub}</p>}
     </div>
   );
 }

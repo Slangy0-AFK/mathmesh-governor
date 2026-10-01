@@ -9,6 +9,12 @@ between the caller and the model, and it enforces limits server-side before
 any spend. It does not sandbox the agent. That distinction is the point of
 everything below.
 
+## Operations
+
+Running this in production means more than the controls themselves: data
+retention, who can access stored prompts and outputs, key rotation, deployment
+requirements, and monitoring for failures. See [OPERATIONS.md](./OPERATIONS.md).
+
 ## Test a model directly from GitHub (no site or Base44 account)
 
 Clone this public repository, install dependencies, and run the same six-case reference benchmark used by the app. Testers use their own provider account and key; the key is sent directly from their machine to that provider and is not saved by this project.
@@ -26,7 +32,22 @@ MODEL_PROVIDER=compatible MODEL_ID=<model-id> MODEL_API_KEY=<provider-key> MODEL
 
 The command prints pass/fail/error results and writes full prompts, reference answers, observed outputs, timing, and provider-reported token usage to `mathmesh-benchmark-results.json`. It exits unsuccessfully when any case fails or errors, making fabricated or missing outputs visible rather than counting them as passes.
 
-This is a small public structured-output smoke test, not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
+This is a small public structured-output smoke test (ten cases), not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
+
+## Live backend enforcement tests
+
+The browser smoke tests only check that pages load. The enforcement suite
+verifies the actual controls against the deployed backend: unknown agents,
+wrong keys, frozen and revoked agents, disallowed actions, the rate limit,
+token-budget exhaustion, the global emergency stop, audit-chain verification,
+the egress allowlist, and the grounding review queue. It runs through the
+app's own authenticated SDK and cleans up its probe data afterwards.
+
+```bash
+E2E_AUTH_EMAIL=<admin-email> E2E_AUTH_PASSWORD=<password> npm run test:e2e:enforcement
+```
+
+It skips automatically when those credentials are not set.
 
 ## Quick start: run it and hook agents up
 
@@ -177,10 +198,14 @@ Threshold sweep (semantic detector, same 24 cases):
 | 0.7 | 70.0% | 7.1% | 3 | 1 |
 | 0.8 | 70.0% | 7.1% | 3 | 1 |
 
-**Scope of these numbers:** 24 cases, single author, LLM-as-judge (no
-embedding endpoint on the platform), non-deterministic across runs. Valid
-for comparing thresholds and for catching a broken detector. Not a general
-benchmark, and not a claim about behavior in the wild.
+**Scope of these numbers:** The detector is evaluated against a 24-case
+**tuning** set (the threshold was chosen on it, so its numbers are optimistically
+overfit) and a separate 12-case **held-out** set that was never used to tune.
+Both are single-author, LLM-as-judge (no embedding endpoint on the platform),
+non-deterministic across runs — so the panel also supports repeated runs and
+reports TPR/FPR as a mean ± standard deviation. Valid for comparing thresholds
+and for catching a broken detector. Not a general benchmark, not independent
+review, and not a claim about behavior in the wild.
 
 The high keyword FPR is the finding: substring matching flags on-task
 answers that merely use decoy vocabulary.
