@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { admitRequest } from '../../shared/admission.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
+import { checkEgressPermission, parseEgressTarget } from '../../shared/egressPolicy.ts';
 
 /**
  * Egress proxy — the only outbound network path the harness controls.
@@ -52,37 +53,18 @@ export default async function (req: Request): Promise<Response> {
       return Response.json({ error: reason, haltedAt: 'Egress', host, serverEnforced: true }, { status: 403 });
     };
 
-    let parsed: URL;
-    try {
-      parsed = new URL(targetUrl);
-    } catch {
-      return await blocked('Destination is not a valid absolute URL.', targetUrl.slice(0, 80));
-    }
+    const parsed = parseEgressTarget(targetUrl, method);
+    if (!parsed.allowed) return await blocked(parsed.reason, parsed.host);
 
-    // Scheme is fixed, not allowlisted: anything but https is refused outright.
-    if (parsed.protocol !== 'https:') {
-      return await blocked(`Scheme "${parsed.protocol}" is not permitted. Only https is allowed.`, parsed.hostname);
-    }
-
-    const rows = await svc.entities.EgressAllowlist.filter({ host: parsed.hostname }, '-created_date', 1);
+    const { target } = parsed;
+    const rows = await svc.entities.EgressAllowlist.filter({ host: target.host }, '-created_date', 1);
     const entry = rows.length > 0 ? rows[0] : null;
+    const permission = checkEgressPermission(target, entry);
+    if (!permission.allowed) return await blocked(permission.reason, target.host);
 
-    if (!entry || entry.enabled === false) {
-      return await blocked(
-        `Host "${parsed.hostname}" is not on the egress allowlist${entry ? ' (entry is disabled)' : ''}. Default is deny.`,
-        parsed.hostname,
-      );
-    }
-
-    const methods = (Array.isArray(entry.allowed_methods) && entry.allowed_methods.length > 0)
-      ? entry.allowed_methods.map((m: string) => m.toUpperCase())
-      : ['GET'];
-    if (!methods.includes(method)) {
-      return await blocked(`Method ${method} is not permitted for "${parsed.hostname}" (allowed: ${methods.join(', ')}).`, parsed.hostname);
-    }
-
-    const upstream = await fetch(parsed.toString(), {
+    const upstream = await fetch(target.url, {
       method,
+      redirect: 'manual',
       headers: { 'Accept': 'application/json, text/plain;q=0.9, */*;q=0.5' },
       body: method === 'GET' || method === 'HEAD' ? undefined : (typeof body.body === 'string' ? body.body : undefined),
     });
@@ -94,13 +76,13 @@ export default async function (req: Request): Promise<Response> {
     await appendAudit(svc, {
       event_type: 'EGRESS_ALLOWED', agent_id: agentId, gate: 'Egress',
       session_nonce: body.sessionNonce || '', action,
-      details: `ALLOWED ${method} https://${parsed.hostname}${parsed.pathname} → ${upstream.status}, ${raw.length} bytes.`,
+      details: `ALLOWED ${method} https://${target.host}${new URL(target.url).pathname} → ${upstream.status}, ${raw.length} bytes.`,
       enforcement: 'none', server_enforced: true,
     });
 
     return Response.json({
-      host: parsed.hostname,
-      method,
+      host: target.host,
+      method: target.method,
       status: upstream.status,
       truncated,
       bodyLength: raw.length,

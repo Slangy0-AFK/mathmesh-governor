@@ -41,12 +41,11 @@ export default function AuditChainPanel() {
         </Button>
       </div>
       <p className="text-xs text-slate-500 leading-relaxed mb-3">
-        Each audit event carries a sequence number, the previous event's hash, a hash of its own facts,
-        and a server-only HMAC. Editing a row, deleting one, or forging a replacement all become
-        detectable here. This is tamper-<span className="font-medium">evident</span>, not append-only —
-        the table is still writable and rows can still be deleted, but doing so leaves a detectable
-        sequence gap or broken link, so damage cannot be silent. True immutability needs append-only
-        storage the app layer does not provide.
+  Each audit event carries a sequence number, the previous event's hash, a hash of its own facts,
+  and a server-only HMAC. Verification can identify many changes or removals, but the table is
+  still writable and rows can still be deleted. This is tamper-<span className="font-medium">evident</span>,
+  not append-only storage; deletion leaves a detectable sequence gap or broken link. True
+  immutability needs append-only storage the app layer does not provide.
       </p>
 
       {error && <p className="text-xs text-red-600 mb-2">{error}</p>}

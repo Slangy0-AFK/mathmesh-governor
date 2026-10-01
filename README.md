@@ -2,12 +2,38 @@
 
 [Open the live MathMesh Governor app](https://lean-math-mesh.base44.app)
 
-## Harness Status — Measured, Not Claimed
+## What MathMesh Governor Does
 
-This is a governance and containment layer for AI agent workflows. It sits
-between the caller and the model, and it enforces limits server-side before
-any spend. It does not sandbox the agent. That distinction is the point of
-everything below.
+MathMesh Governor is a test environment for checking how AI agents use models
+and tools. For requests sent through this app, it checks agent access and usage
+limits before a model request, records key decisions, and can withhold answers
+that are not supported by supplied information.
+
+Some checks run in the browser, and usage limits are estimates rather than the
+provider's final bill. The app does not isolate an agent or control activity
+outside this app. Test results are preliminary; they are not independent
+validation or a safety certification.
+
+For test instructions and known evidence limits, see [LAB_EVALUATION.md](LAB_EVALUATION.md).
+For deployment and operator checks, see [OPERATIONS.md](OPERATIONS.md).
+
+## Benefits and Problems It Addresses
+
+For requests sent through this app, MathMesh Governor can help teams:
+
+- Refuse requests from agents that are not registered or do not have permission
+  to perform the requested action.
+- Set request and estimated usage limits for each agent to reduce unexpected
+  or repeated use. These estimates do not set a hard limit on the provider's bill.
+- Detect repeated actions and reuse a response for an identical request, which
+  can avoid some unnecessary model calls.
+- Identify answers that are not supported by supplied information and send them
+  for human review instead of returning them as verified.
+- Keep a record of requests and decisions so teams can review what happened.
+
+These controls address access, overuse, repeated requests, unsupported answers,
+and limited visibility into agent activity. They do not make model responses
+faster: some checks require additional model requests and can add time and cost.
 
 ## Operations
 
@@ -17,7 +43,7 @@ requirements, and monitoring for failures. See [OPERATIONS.md](./OPERATIONS.md).
 
 ## Test a model directly from GitHub (no site or Base44 account)
 
-Clone this public repository, install dependencies, and run the same six-case reference benchmark used by the app. Testers use their own provider account and key; the key is sent directly from their machine to that provider and is not saved by this project.
+Clone this public repository, install dependencies, and run the same ten-case reference benchmark used by the app. Testers use their own provider account and key; the key is sent directly from their machine to that provider and is not saved by this project.
 
 ```bash
 npm install
@@ -32,7 +58,7 @@ MODEL_PROVIDER=compatible MODEL_ID=<model-id> MODEL_API_KEY=<provider-key> MODEL
 
 The command prints pass/fail/error results and writes full prompts, reference answers, observed outputs, timing, and provider-reported token usage to `mathmesh-benchmark-results.json`. It exits unsuccessfully when any case fails or errors, making fabricated or missing outputs visible rather than counting them as passes.
 
-This is a small public structured-output smoke test (ten cases), not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
+This is a small author-written public structured-output smoke test (ten cases), not an independent or held-out evaluation and not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
 
 ## Live backend enforcement tests
 

@@ -9,6 +9,7 @@
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
+    "test:unit": "node --import tsx --import ./tests/register-base44-runtime.js --test tests/*.test.js",
     "test:e2e": "playwright test",
     "test:e2e:enforcement": "playwright test e2e/enforcement.spec.js",
     "test:e2e:ui": "playwright test --ui",
@@ -72,9 +73,8 @@
     "react-hot-toast": "^2.6.0",
     "react-leaflet": "^4.2.1",
     "react-markdown": "^9.0.1",
-    "react-quill-new": "^3.8.3",
     "react-resizable-panels": "^2.1.7",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "^7.18.4",
     "recharts": "^2.15.4",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
@@ -100,6 +100,7 @@
     "globals": "^15.14.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.2",
     "vite": "^6.1.0"
   }

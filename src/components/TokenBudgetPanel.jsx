@@ -58,7 +58,7 @@ export default function TokenBudgetPanel() {
   const overheadPct = total > 0 ? Math.round((overhead / total) * 100) : 0;
 
   return (
-    <div>
+    <div data-testid="token-budget-panel" data-loading={loading}>
       <div className="flex items-center gap-2 mb-1">
         <Gauge className="w-4 h-4 text-slate-500" />
         <p className="text-sm font-semibold text-slate-700">Token Budget</p>
@@ -67,10 +67,10 @@ export default function TokenBudgetPanel() {
         </Button>
       </div>
       <p className="text-xs text-slate-500 leading-relaxed mb-3">
-        Spend is bounded in estimated tokens per agent, not in requests — twenty long requests cost
-        far more than twenty short ones, so a request cap never bounded exhaustion. Every number here
-        is a chars/4 estimate, because the platform does not report provider usage. These are
-        estimated limits, not a provider bill — treat them as a budget unit, not a charge.
+  Spend is bounded in estimated tokens per agent, not in requests; long requests cost more
+  than short ones. Every number here is a chars/4 estimate because the platform does not report
+  provider usage. These estimated limits are not a provider bill or charge cap and apply only
+  to requests sent through this app.
         {policy?.enforce_token_budget === false && ' ENFORCEMENT IS OFF — spend is measured but never denied.'}
       </p>
 
@@ -82,8 +82,7 @@ export default function TokenBudgetPanel() {
           <span className="font-semibold">{total.toLocaleString()}</span> est. tokens ({overheadPct}%).
         </p>
         <p className="text-xs text-slate-500 mt-0.5">
-          That is what the harness spends judging its own agents. It is charged to the same budget on
-          purpose — a token-saving harness that hides its own consumption is only moving the cost.
+          Model calls made by the checks are included in this estimate.
         </p>
       </div>
 

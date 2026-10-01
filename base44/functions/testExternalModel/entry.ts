@@ -18,7 +18,7 @@ export default async function(req) {
     if (body.version !== VERSION) return Response.json({ error: 'Benchmark version mismatch. Reload the task template.' }, { status: 400 });
     if (typeof body.model !== 'string' || !body.model.trim() || body.model.length > 150) return Response.json({ error: 'Model ID or submitted model label is required.' }, { status: 400 });
     if (body.mode === 'submitted') {
-      if (!Array.isArray(body.answers) || body.answers.length > CASES.length || body.answers.some(a => !a || !CASES.some(c => c.id === a.id) || typeof a.answer !== 'string' || a.answer.length > 4000) || new Set(body.answers.map(a => a.id)).size !== body.answers.length) return Response.json({ error: 'Use up to six unique known case IDs, each with an answer string of at most 4,000 characters.' }, { status: 400 });
+      if (!Array.isArray(body.answers) || body.answers.length > CASES.length || body.answers.some(a => !a || !CASES.some(c => c.id === a.id) || typeof a.answer !== 'string' || a.answer.length > 4000) || new Set(body.answers.map(a => a.id)).size !== body.answers.length) return Response.json({ error: `Use up to ${CASES.length} unique known case IDs, each with an answer string of at most 4,000 characters.` }, { status: 400 });
       const cases = CASES.map(test => {
         const observed = body.answers.find(a => a.id === test.id)?.answer || '';
         return { ...test, observed, ...scoreAnswer(test, observed), latencyMs: null, usage: null };

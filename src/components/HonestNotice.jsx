@@ -6,34 +6,34 @@ export default function HonestNotice() {
       <div className="flex items-start gap-3">
         <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-slate-700">What this is, plainly</p>
+          <p className="text-sm font-semibold text-slate-700">What this test environment does</p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            This is a working simulator of a request pipeline placed in front of an LLM. Three parts
-            save real money: the response cache (skips the call entirely on exact repeats), the
-            filler-stripping compressor (small but free), and the cheap checks that halt obviously
-            bad requests before any call is made.
+            MathMesh Governor lets teams examine how AI agent requests are handled. For requests sent
+            through this app, the server checks agent access and usage limits before a model request,
+            records key decisions, and can withhold answers that are not supported by supplied material.
+            Other checks identify repeated requests and can avoid an identical model call.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Three parts cost money to run: semantic dedup and knowledge retrieval are each an LLM
-            call of their own, and drift detection adds a decoy block to every prompt. They earn
-            their keep only when the request they stop or improve is worth more than they cost.
+            The usage limit is based on estimated tokens, not the provider's final bill. Some checks
+            also require model requests of their own, so the test results include costs that should
+            be considered when evaluating the system.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            The <span className="font-medium">89% figure</span> from the earlier benchmark came
-            largely from repeating identical payloads, which the cache trivially absorbs. Treat it
-            as a best case for repetitive traffic, not a general result. On varied, novel requests
-            the pipeline costs more per request than calling the model directly.
+            The published detector results come from a small, hand-labeled test set. They are useful
+            for inspecting this version, but they do not establish performance on other models,
+            tasks, or deployments. Independent testing is still needed.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            The pipeline also runs in the browser, so it governs cooperating agents. It is not a
-            security boundary against a hostile caller — that would need to live server-side.
+            The pipeline also runs in the browser, so it governs cooperating agents; it is not a
+            security boundary against a hostile caller. Server-side access controls do not isolate
+            an agent or control activity that takes place outside this app. This is a testable
+            prototype, not a security certification or proof that an AI system is safe.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Most importantly: this detects, it does not contain. There is no sandbox, so a halt
-            withholds a result rather than stopping an agent from acting. The controls here do not
-            govern anything an agent does outside this app — an agent with its own network route or
-            runtime is unaffected, because isolation would have to live below the app layer. The
-            scorecard further down lists every requirement that is still missing.
+            Most importantly, this detects but does not contain. There is no sandbox, so a halt
+            withholds a result rather than stopping an agent from acting. An agent with its own
+            network route or runtime is unaffected; isolation would have to live below the app
+            layer. The scorecard further down lists requirements that are still missing.
           </p>
         </div>
       </div>

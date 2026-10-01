@@ -33,6 +33,8 @@ test.describe('Live backend enforcement', () => {
     const context = await browser.newContext();
     page = await context.newPage();
     await page.goto(baseURL || '/');
+    const exposesClient = await page.evaluate(() => Boolean(window.__base44));
+    test.skip(!exposesClient, 'Live SDK tests require the client to be exposed on window.__base44.');
     const email = page.getByLabel(/email/i).or(page.getByPlaceholder(/email/i)).first();
     const password = page.getByLabel(/password/i).or(page.getByPlaceholder(/password/i)).first();
     await expect(email).toBeVisible({ timeout: 15_000 });
@@ -239,5 +241,65 @@ test.describe('Live backend enforcement', () => {
       return { status: updated?.status };
     }, PROBE);
     expect(result.status).toBe('approved');
+  });
+});
+
+const liveEnabled = process.env.E2E_RUN_LIVE === 'true';
+const credentialsConfigured = Boolean(
+  process.env.E2E_AUTH_EMAIL &&
+  process.env.E2E_AUTH_PASSWORD &&
+  process.env.E2E_BASE_URL
+);
+
+if (liveEnabled && !credentialsConfigured) {
+  throw new Error('Live enforcement tests require E2E_AUTH_EMAIL, E2E_AUTH_PASSWORD, and E2E_BASE_URL.');
+}
+
+async function signInAsAdmin(page) {
+  await page.goto('/');
+
+  const email = page.getByLabel(/email/i).first();
+  if (await email.isVisible().catch(() => false)) {
+    await email.fill(process.env.E2E_AUTH_EMAIL);
+    await page.getByLabel(/password/i).first().fill(process.env.E2E_AUTH_PASSWORD);
+    await page.getByRole('button', { name: /log ?in|sign ?in/i }).click();
+  }
+
+  await expect(page.getByRole('heading', { name: 'MathMesh Governor' })).toBeVisible({ timeout: 45_000 });
+}
+
+test.describe('Live enforcement checks', () => {
+  test.skip(!credentialsConfigured, 'Configure E2E credentials and E2E_BASE_URL to run against a test deployment.');
+
+  test.beforeEach(async ({ page }) => {
+    await signInAsAdmin(page);
+  });
+
+  test('unknown agent is denied before model use or token spend', async ({ page }) => {
+    const agentId = `e2e-unknown-${Date.now()}`;
+
+    await expect(page.getByText('Agent keys required', { exact: true })).toBeVisible();
+    await page.getByLabel('Registered agent name').fill(agentId);
+    await page.getByLabel('Requested action').fill('Write_Database_Record');
+    await page.getByLabel(/Agent access key/).fill('');
+    await page.getByRole('button', { name: 'Run test' }).click();
+
+    await expect(page.getByText(new RegExp(`Server denied admission at Identity: Unknown agent "${agentId}"`)))
+      .toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Sonnet 4\.6 Response/)).toHaveCount(0);
+
+    await page.reload();
+    const budgetPanel = page.getByTestId('token-budget-panel');
+    await expect(budgetPanel).toHaveAttribute('data-loading', 'false', { timeout: 30_000 });
+    await expect(budgetPanel.getByText(agentId, { exact: true })).toHaveCount(0);
+  });
+
+  test('signed self-test passes all live cases', async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.getByRole('button', { name: 'Run signed test' }).click();
+
+    await expect(page.getByText(/7\/7 passed/)).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText(/^sha256: [0-9a-f]{64}$/)).toBeVisible();
+    await expect(page.getByText(/^hmac: [0-9a-f]{64}$/)).toBeVisible();
   });
 });

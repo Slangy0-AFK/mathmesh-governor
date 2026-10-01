@@ -30,63 +30,63 @@ import { Play, RotateCcw, Zap, Shield, Activity, ListOrdered, FlaskConical, Load
 
 const PRESETS = [
   {
-    label: 'Test 1: Clean Pass',
+    label: 'Example: Allowed request',
     agentId: 'FactChecker_1',
     payload: 'Summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.',
     action: 'Fetch_Database_Record',
     votes: '10, 12, 14',
   },
   {
-    label: 'Test 2: Mismatch Breakdown',
+    label: 'Example: Values do not match',
     agentId: 'Router_2',
     payload: 'Valid payload text for routing.',
     action: 'Route_To_Web',
     votes: '8, 16, 21',
   },
   {
-    label: 'Test 3: Loop Breaker ×1',
+    label: 'Example: First repeated request',
     agentId: 'Synthesizer_1',
     payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
   {
-    label: 'Test 3: Loop Breaker ×2',
+    label: 'Example: Second repeated request',
     agentId: 'Synthesizer_1',
     payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
   {
-    label: 'Test 3: Loop Breaker ×3 (KILLS)',
+    label: 'Example: Repeated request is stopped',
     agentId: 'Synthesizer_1',
     payload: 'Data payload for synthesis.',
     action: 'Call_API_Tool',
     votes: '2, 4, 6',
   },
   {
-    label: 'Test 4: Noise Input',
+    label: 'Example: Empty request',
     agentId: 'Agent_X',
     payload: '   ',
     action: 'Process',
     votes: '4, 8, 12',
   },
   {
-    label: 'Test 5: Semantic Loop (Base 12)',
+    label: 'Example: Repeated action',
     agentId: 'Researcher_1',
     payload: 'Search for information about climate data.',
     action: 'Query_Web_Search',
     votes: '6, 8, 10',
   },
   {
-    label: 'Test 5b: Semantic Loop (rephrased)',
+    label: 'Example: Reworded repeated action',
     agentId: 'Researcher_1',
     payload: 'Search for information about climate data.',
     action: 'Look_Up_Internet_Results',
     votes: '6, 8, 10',
   },
   {
-    label: 'Test 6: Cache Hit (run twice)',
+    label: 'Example: Identical request (run twice)',
     agentId: 'CacheTest_1',
     payload: 'Please could you kindly summarize the key findings from the Q3 revenue report and highlight any anomalies in the European market segment.',
     action: 'Fetch_Database_Record',
@@ -264,14 +264,14 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 leading-none">MathMesh Governor</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Request pipeline simulator · Cache, filters &amp; drift canary</p>
+              <p className="text-xs text-slate-400 mt-0.5">A test environment for agent access, usage limits, and answer checks</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Sparkles className={`w-4 h-4 ${llmEnabled ? 'text-indigo-500' : 'text-slate-300'}`} />
               <Switch checked={llmEnabled} onCheckedChange={setLlmEnabled} />
-              <span className="text-xs text-slate-500 font-medium hidden sm:inline">LLM Gates</span>
+              <span className="text-xs text-slate-500 font-medium hidden sm:inline">Model checks</span>
             </div>
             <Button variant="outline" size="sm" onClick={handleResetAll} className="text-slate-500 border-slate-200">
               <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -316,7 +316,7 @@ export default function Home() {
 
             {/* Preset tests */}
             <div className="bg-white rounded-xl border border-slate-100 p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quick Presets</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Example requests</p>
               <div className="flex flex-wrap gap-2">
                 {PRESETS.map((p, i) => (
                   <button
@@ -332,7 +332,7 @@ export default function Home() {
 
             {/* Input form */}
             <div className="bg-white rounded-xl border border-slate-100 p-5 space-y-4">
-              <p className="text-sm font-semibold text-slate-700">Pipeline Input</p>
+              <p className="text-sm font-semibold text-slate-700">Test request</p>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Plain-language terms: <span className="font-medium text-slate-500">Raw Payload</span> is the
                 text the agent wants processed. <span className="font-medium text-slate-500">Vote Array</span>{' '}
@@ -344,7 +344,7 @@ export default function Home() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Agent ID</Label>
+                  <Label className="text-xs font-medium text-slate-600">Registered agent name</Label>
                   <Input
                     value={agentId}
                     onChange={e => setAgentId(e.target.value)}
@@ -354,7 +354,7 @@ export default function Home() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-600">Current Action</Label>
+                  <Label className="text-xs font-medium text-slate-600">Requested action</Label>
                   <Input
                     value={action}
                     onChange={e => setAction(e.target.value)}
@@ -367,7 +367,7 @@ export default function Home() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-600">
-                  Agent Key <span className="text-slate-400 font-normal">(issued in the identity registry below)</span>
+                  Agent access key <span className="text-slate-400 font-normal">(issued in the agent list below)</span>
                 </Label>
                 <Input
                   type="password"
@@ -378,18 +378,17 @@ export default function Home() {
                   disabled={isRunning}
                 />
                 <p className="text-xs text-slate-400">
-                  While key authentication is on, a request without the right key for this agent id is refused at
-                  Identity, before any spend.
+                  Requests without this agent's valid key are refused before model use.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-600">Raw Payload</Label>
+                <Label className="text-xs font-medium text-slate-600">Request text</Label>
                 <p className="text-xs text-slate-400">The text the agent wants the model to process.</p>
                 <Textarea
                   value={payload}
                   onChange={e => setPayload(e.target.value)}
-                  placeholder="Paste your raw input payload here..."
+                  placeholder="Enter the text the agent should process..."
                   className="text-sm resize-none h-24"
                   disabled={isRunning}
                 />
@@ -397,7 +396,7 @@ export default function Home() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-600">
-                  Vote Array <span className="text-slate-400 font-normal">(comma-separated integers)</span>
+                  Example check values <span className="text-slate-400 font-normal">(comma-separated numbers)</span>
                 </Label>
                 <p className="text-xs text-slate-400">
                   Numbers agents use to signal agreement. The pipeline checks their parity (all-even or
@@ -410,6 +409,9 @@ export default function Home() {
                   className="text-sm h-9 font-mono"
                   disabled={isRunning}
                 />
+                <p className="text-xs text-slate-400">
+                  This demo check only passes when all values are even or all are odd. These values are not votes from agents.
+                </p>
               </div>
 
               <Button
@@ -425,7 +427,7 @@ export default function Home() {
                 ) : (
                   <>
                     <Play className="w-4 h-4 mr-2" />
-                    Run Mesh Pipeline
+                    Run test
                   </>
                 )}
               </Button>
@@ -439,7 +441,7 @@ export default function Home() {
 
             {/* Pipeline gate results */}
             <div className="bg-white rounded-xl border border-slate-100 p-5">
-              <p className="text-sm font-semibold text-slate-700 mb-4">Pipeline Gate Results</p>
+              <p className="text-sm font-semibold text-slate-700 mb-4">Test results</p>
               <div className="space-y-3">
                 {lastResult && lastResult.steps && lastResult.steps.length > 0 ? (
                   lastResult.steps.map((s) => (
@@ -552,7 +554,7 @@ export default function Home() {
             <div className="bg-white rounded-xl border border-slate-100 p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Activity className="w-4 h-4 text-slate-500" />
-                <p className="text-sm font-semibold text-slate-700">Agent State Tracker</p>
+                <p className="text-sm font-semibold text-slate-700">Agent status</p>
               </div>
               <AgentStatePanel
                 governor={governorRef.current}

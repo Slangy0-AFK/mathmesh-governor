@@ -97,3 +97,58 @@ need it for operations and review.
    unverified and investigate which event was altered or removed.
 4. If a key may be compromised, rotate it and review that agent's recent runs
    for drift or unexpected spend.
+## Additional Operations Checklist
+
+Use a separate deployment and synthetic data for external reviews and live
+tests. The app's server controls apply only to requests sent through this app;
+they do not isolate an agent or restrict other network access.
+
+## Before Deployment
+
+- Confirm Base44 authentication, role assignment, and row-level access rules
+  for every entity used by the app. This repository does not establish that the
+  deployed Base44 permissions are correct.
+- Configure `HARNESS_SIGNING_SECRET` as a server-only secret. Do not put it in a
+  `VITE_*` variable, browser code, prompts, or logs.
+- Keep provider credentials in the provider's supported secret store. Never
+  commit credentials or include them in test artifacts.
+- Verify the global stop, agent-key requirement, per-agent permissions, request
+  limits, and estimated-token limits in the deployed app before allowing traffic.
+- Confirm that agents cannot reach tools or external services through routes
+  that bypass the app if those routes must be restricted. The app's egress list
+  only applies to calls sent through its proxy.
+- Set and document retention, backup, deletion, and reviewer access rules for
+  prompts, model outputs, identity records, token records, and audit events.
+  These depend on the deployed Base44 configuration and are not established by
+  the source code alone.
+
+## Keys and Accounts
+
+- Use a dedicated administrator account for the test deployment. Do not share
+  production administrator credentials with reviewers.
+- Store agent keys in the agent runtime's secret store. The app shows a key once
+  and stores its hash; rotate a key if it is lost or may have been exposed.
+- Give reviewers individual accounts with only the access needed for their
+  evaluation. Remove or disable those accounts when the review ends.
+
+## Monitoring and Response
+
+- Review denied requests, token estimates, grounding reviews, egress decisions,
+  and audit verification during testing.
+- Set provider-side billing alerts and limits separately. The app's token
+  estimate is not a provider billing cap.
+- Define who responds to a false denial, an unexpected allowed request, a
+  suspected key exposure, a broken audit chain, or a provider outage.
+- Preserve relevant run identifiers and audit results, but do not place secrets
+  or unnecessary personal data in incident notes.
+- Test the rollback procedure before changing the live deployment. Keep a
+  known-good revision and record which deployment is under review.
+
+## Guarantees to State Accurately
+
+- Audit records are tamper-evident, not append-only or immutable.
+- Usage limits are based on estimates, not provider-reported billing data.
+- Egress restrictions cover calls routed through this app's proxy only.
+- A stopped request does not stop an agent that can act outside this app.
+- The repository does not provide automatic alerting, incident response,
+  independent security review, or a safety certification.
