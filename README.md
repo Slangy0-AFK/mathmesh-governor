@@ -2,12 +2,27 @@
 
 [Open the live MathMesh Governor app](https://lean-math-mesh.base44.app)
 
+This is a public demonstration, not an independently assessed production
+deployment. Do not submit secrets, sensitive prompts, or production traffic.
+The live link does not establish that the deployed configuration or its
+operational controls have been independently verified.
+
 ## What MathMesh Governor Does
 
-MathMesh Governor is a test environment for checking how AI agents use models
-and tools. For requests sent through this app, it checks agent access and usage
-limits before a model request, records key decisions, and can withhold answers
-that are not supported by supplied information.
+MathMesh Governor is a test environment for governing AI agent requests. Its
+central contribution is the admission-control design: the server-side gate is
+called from the functions that actually spend tokens or make outbound calls,
+not exposed as an optional check that a caller can skip. It verifies identity
+and policy, applies lifecycle and tool permissions, reserves rate-limit and
+token-budget capacity, and records the decision before allowing the call.
+
+This enforcement path is separate from the model-assisted quality checks.
+Those checks use LLMs for semantic deduplication and drift/grounding assessment;
+they are probabilistic and can vary between runs. With the LLM-backed stages
+enabled, dedup makes its own model call and drift/grounding share a judge call;
+a full run can make two to three model calls, charged to the agent's token
+budget. The admission policy checks are deterministic rules; the overall
+quality path is not deterministic.
 
 Some checks run in the browser, and usage limits are estimates rather than the
 provider's final bill. The app does not isolate an agent or control activity
@@ -219,17 +234,19 @@ server-side, audited, and fail closed if the enforcement path is unreachable.
 | Output signature | Server-side | HMAC-SHA256 under a secret the client never sees |
 | Audit chain | Server-side | Sequence + prev-hash + row-hash + HMAC; tamper-evident |
 
-### Detector evaluation — measured TPR / FPR
+### Detector sanity check (tuning set only)
 
-The semantic drift detector was run against a 24-case hand-labeled set,
-alongside the keyword detector it replaced, on the same cases.
+One author-run sanity check compared the semantic drift detector with the
+keyword baseline on the same 24-case, hand-labeled tuning set. The threshold
+was selected using this set, so these figures are tuning results, not an
+unbiased estimate of performance:
 
 | Detector | TPR (drift caught) | FPR (false alarms) |
 |---|---:|---:|
 | Semantic (LLM judge) | 100.0% | 7.1% |
 | Keyword baseline | 70.0% | 28.6% |
 
-Threshold sweep (semantic detector, same 24 cases):
+The following threshold sweep is on those same tuning cases:
 
 | Threshold | TPR | FPR | Missed | False alarms |
 |---:|---:|---:|---:|---:|
@@ -241,17 +258,17 @@ Threshold sweep (semantic detector, same 24 cases):
 | 0.7 | 70.0% | 7.1% | 3 | 1 |
 | 0.8 | 70.0% | 7.1% | 3 | 1 |
 
-**Scope of these numbers:** The detector is evaluated against a 24-case
-**tuning** set (the threshold was chosen on it, so its numbers are optimistically
-overfit) and a separate 12-case **held-out** set that was never used to tune.
-Both are single-author, LLM-as-judge (no embedding endpoint on the platform),
-non-deterministic across runs — so the panel also supports repeated runs and
-reports TPR/FPR as a mean ± standard deviation. Valid for comparing thresholds
-and for catching a broken detector. Not a general benchmark, not independent
-review, and not a claim about behavior in the wild.
+This is a small, single-author sanity check using an LLM judge, not a detector
+evaluation that supports general performance claims. The judge is
+non-deterministic, so repeated runs can differ. A separate 12-case held-out set
+exists in the project, but held-out TPR/FPR results are not reported here;
+therefore no held-out performance claim is made. These checks can help catch
+obvious regressions, but are not an independent review or evidence of behavior
+in other models or deployments.
 
-The high keyword FPR is the finding: substring matching flags on-task
-answers that merely use decoy vocabulary.
+The tuning-set observation is that keyword matching flagged some on-task
+answers that used decoy vocabulary. It is not evidence that the semantic
+detector will perform similarly on unseen cases.
 
 ### Status against the review
 
@@ -280,12 +297,14 @@ answers that merely use decoy vocabulary.
 
 **Tier 2**
 
-- **Semantic detector instead of keyword matching** — *Built.* LLM-as-judge
-  with a graded 0–1 score per decoy. Non-deterministic. Giving the judge
-  the real task cut measured false positives from 21% to 7%.
-- **Threshold tuned on labeled examples, TPR + FPR published** — *Built.*
-  24 labeled cases with hard negatives, full sweep, keyword baseline on the
-  same set. Small set, single author.
+- **Semantic detector instead of keyword matching** — *Implemented, not
+  independently validated.* LLM-as-judge with a graded 0–1 score per decoy;
+  it is non-deterministic. The small author-written tuning set is a sanity
+  check, not a general detector evaluation.
+- **Threshold tuning and detector reporting** — *Built, limited evidence.* A
+  24-case tuning set, threshold sweep, and keyword comparison are available.
+  Held-out TPR/FPR results are not reported here; labels and cases are not
+  independently reviewed.
 - **Randomized, multi-decoy placement** — *Built.* 6 decoys of 5 kinds,
   random subset and order, random placement, at least one innocuous. Corpus
   rotates but does not regenerate.
@@ -349,7 +368,3 @@ It is also not a complete security or compliance system. It depends on:
 - Durable audit storage and access control
 - Live-backend E2E coverage
 - Monitoring, alert routing, incident response, and operator training
- **the harness supplies a strong governance and
-containment layer for AI workflows that pass through it, with measured
-detector performance and stated limits. It still needs correctly configured
-infrastructure and operational processes around it.**
