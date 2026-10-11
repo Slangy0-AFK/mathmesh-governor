@@ -87,16 +87,78 @@ need it for operations and review.
   after any change to the detector or judge prompt. A drop in TPR or a rise in FPR
   on the held-out set is the signal that a change regressed detection.
 
+### Error tracking and metrics
+
+- Configure `VITE_SENTRY_DSN` in each frontend build to enable browser error
+  reporting. It is a public project identifier and will be present in the bundle;
+  do not put credentials in `VITE_*` variables.
+- Store `SENTRY_DSN` and `APP_ENV` as Base44 server secrets to enable exception
+  reporting for `processWithSonnet`, `egressProxy`, and the metrics exporter.
+  Events exclude default PII; backend logs contain JSON error type/function fields
+  and do not include request payloads.
+- Store a high-entropy `PROMETHEUS_SCRAPE_TOKEN` as a Base44 secret and the same
+  value in the Prometheus scraper's secret store. `GET /api/metrics` requires it
+  as a bearer token and emits gauges aggregated over at most the newest 1,000
+  retained `PipelineRun` records. These are retained-record snapshots, not
+  lifetime counters or provider billing data. Scrape no more frequently than
+  once per minute to bound database reads.
+- `GET /api/health` is a liveness check only. A successful response means the
+  function runtime responded; it does not prove model providers or data services
+  are healthy.
+
+Example Prometheus scrape configuration (keep the token in a mounted secret
+file, not in source control):
+
+```yaml
+scrape_configs:
+  - job_name: mathmesh-governor
+    metrics_path: /api/metrics
+    scheme: https
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/mathmesh_scrape_token
+    static_configs:
+      - targets: [lean-math-mesh.base44.app]
+```
+
 ## Incident response
 
-1. If an agent is misbehaving, freeze it (reversible) or revoke it (terminal)
-   from the Agent Identity Registry. Both are audited.
-2. If the whole harness must stop, engage the global emergency stop
-   (`HarnessControl.kill_all`). Every request is then denied before any spend.
-3. If the audit chain reports tampering, treat all verdicts after the break as
-   unverified and investigate which event was altered or removed.
-4. If a key may be compromised, rotate it and review that agent's recent runs
-   for drift or unexpected spend.
+1. Triage the alert in Sentry or the Base44 function logs. Record the affected
+  function, time window, release revision, and relevant audit sequence numbers;
+  do not copy prompts, keys, or raw user content into an incident ticket.
+2. If an agent is misbehaving, freeze it (reversible) or revoke it (terminal)
+  from the Agent Identity Registry. Both are audited.
+3. If the whole harness must stop, engage the global emergency stop
+  (`HarnessControl.kill_all`). Every request is then denied before any spend.
+4. If the audit chain reports tampering, treat all verdicts after the break as
+  unverified and investigate which event was altered or removed.
+5. If a key or monitoring token may be compromised, rotate it in the owning
+  secret store, update the dependent scraper/runtime, and review recent runs for
+  drift or unexpected spend. Revoke a compromised agent identity as needed.
+6. Preserve relevant logs and audit records, notify the designated incident
+  owner, and document containment and recovery actions before closing the event.
+
+## Rollback procedure
+
+1. Contain unsafe behavior first: freeze/revoke affected agents or engage the
+  global emergency stop. A code rollback does not stop an already active agent.
+2. Identify the last known-good commit from the release record and confirm the
+  issue is code-related. Check entity/schema changes and secrets separately;
+  restoring code does not automatically reverse data changes or rotate secrets.
+3. Revert the bad change through a reviewed Git revert commit, run CI, and deploy
+  that known-good revision to the intended Base44 app using the normal release
+  procedure (`npx base44 deploy --build -y`). Confirm the CLI is linked to the
+  correct environment before deploying.
+4. Verify `/api/health`, sign-in, admission denial/allow behavior, the audit
+  chain, and the global stop in the target environment. Keep the stop engaged
+  until those checks pass, then release it under operator review.
+5. Record the deployed revision, verification evidence, and any manual data or
+  secret recovery. If rollback does not restore safe operation, leave the stop
+  engaged and escalate to Base44 support and the incident owner.
+
+There is no automated deployment or platform rollback workflow in this
+repository today. Treat entity/data migrations as forward-only until a tested
+recovery plan exists.
 ## External Evaluation Deployment
 
 Use a separate Base44 deployment, synthetic data, and dedicated reviewer
@@ -131,5 +193,7 @@ a known-good revision and test rollback before changing a live deployment.
 - Usage limits are estimates, not provider-reported billing caps.
 - Egress restrictions cover calls routed through this app's proxy only.
 - A stopped request does not stop an agent that can act outside this app.
-- The repository does not provide automatic alerting, incident response,
-  independent security review, or a safety certification.
+- Sentry reporting and Prometheus scraping are optional integrations and require
+  operator configuration, alert rules, and on-call ownership.
+- The repository does not provide automatic incident response, independent
+  security review, or a safety certification.

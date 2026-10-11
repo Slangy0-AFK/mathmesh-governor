@@ -1,0 +1,16 @@
+name: Staging Load Test
+on:
+  workflow_dispatch:
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Run bounded HTTP load test
+        env:
+          TARGET_URL: ${{ secrets.LOAD_TEST_TARGET_URL }}
+          AUTH_TOKEN: ${{ secrets.PROMETHEUS_SCRAPE_TOKEN }}
+        run: k6 run tests/load/health-smoke.js

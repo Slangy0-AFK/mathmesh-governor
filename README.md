@@ -16,6 +16,9 @@ validation or a safety certification.
 
 For test instructions and known evidence limits, see [LAB_EVALUATION.md](LAB_EVALUATION.md).
 For deployment and operator checks, see [OPERATIONS.md](OPERATIONS.md).
+For vulnerability reporting, contribution expectations, and project changes,
+see [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md),
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [CHANGELOG.md](CHANGELOG.md).
 
 ## Benefits and Problems It Addresses
 

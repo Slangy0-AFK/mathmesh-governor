@@ -7,6 +7,7 @@ import { appendAudit } from '../../shared/auditChain.ts';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
 import { reserveTokens, reconcileTokens, refundTokens } from '../../shared/tokenLedger.ts';
 import { optimizeModelInput } from '../../shared/inputOptimizer.ts';
+import { reportFunctionError } from '../../shared/observability.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
@@ -160,6 +161,7 @@ ${optimizedPayload}${contextBlock}`;
       decoyPlacement: decoys.placement,
     });
   } catch (error) {
+    await reportFunctionError('processWithSonnet', error);
     return Response.json({ error: (error as Error).message }, { status: 500 });
   }
 }

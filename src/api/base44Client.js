@@ -1,4 +1,5 @@
 import { createClient } from '@base44/sdk';
+import * as Sentry from '@sentry/react';
 import { appParams } from '@/lib/app-params';
 
 const { appId, token, functionsVersion, appBaseUrl } = appParams;
@@ -10,7 +11,10 @@ export const base44 = createClient({
   functionsVersion,
   serverUrl: '',
   requiresAuth: false,
-  appBaseUrl
+  appBaseUrl,
+  options: {
+    onError: (error) => Sentry.captureException(error),
+  },
 });
 
 // Expose the SDK only in an explicitly configured evaluation deployment.

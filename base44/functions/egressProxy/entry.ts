@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
 import { admitRequest } from '../../shared/admission.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
 import { checkEgressPermission, parseEgressTarget } from '../../shared/egressPolicy.ts';
+import { reportFunctionError } from '../../shared/observability.ts';
 
 /**
  * Egress proxy — the only outbound network path the harness controls.
@@ -89,6 +90,7 @@ export default async function (req: Request): Promise<Response> {
       body: truncated ? raw.slice(0, 20000) : raw,
     });
   } catch (error) {
+    await reportFunctionError('egressProxy', error);
     return Response.json({ error: (error as Error).message }, { status: 500 });
   }
 }
