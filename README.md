@@ -4,8 +4,16 @@
 
 This is a public demonstration, not an independently assessed production
 deployment. Do not submit secrets, sensitive prompts, or production traffic.
-The live link does not establish that the deployed configuration or its
-operational controls have been independently verified.
+The live site was updated on 2026-10-11. An unauthenticated browser now sees a
+sign-in screen rather than the Agent Identity Registry; harness data entities
+allow CRUD only to Base44 administrators. Anonymous SDK reads of all 11
+harness entities returned no records, and the production bundle does not
+expose the SDK client on `window.__base44`. `processWithSonnet` and
+`issueAgentKey` require an authenticated app administrator; model-spending,
+egress, admission, audit, and verification functions are also admin-gated.
+Only an authorized app administrator can use the operator dashboard. This
+reduces exposure; it is not independent security validation or a substitute
+for Base44 account and provider-side controls.
 
 ## What MathMesh Governor Does
 
@@ -91,7 +99,10 @@ These tests create and delete probe data, add a temporary spend record, and
 momentarily change the global emergency stop. Run them only against a dedicated
 HTTPS test deployment with synthetic data. The published production URL is
 blocked. The SDK-backed checks require that deployment to be built with
-`VITE_E2E_EXPOSE_BASE44=true`; keep that setting off in production.
+`VITE_E2E_EXPOSE_BASE44=true` and Vite mode `e2e` (for example,
+`VITE_E2E_EXPOSE_BASE44=true npm run build -- --mode e2e`). The SDK client is
+exposed only in that explicit test mode; standard production builds do not
+expose it, even if the flag is accidentally set.
 
 ```bash
 export E2E_RUN_LIVE=true
@@ -234,6 +245,11 @@ server-side, audited, and fail closed if the enforcement path is unreachable.
 | Output signature | Server-side | HMAC-SHA256 under a secret the client never sees |
 | Audit chain | Server-side | Sequence + prev-hash + row-hash + HMAC; tamper-evident |
 
+The audit and output signatures use `HARNESS_SIGNING_SECRET`, read at runtime
+from Base44's server-side secret store; the signing key is not stored in the
+audit table. The operator confirmed that this secret is configured for the
+published deployment.
+
 ### Detector sanity check (tuning set only)
 
 One author-run sanity check compared the semantic drift detector with the
@@ -289,7 +305,7 @@ detector will perform similarly on unseen cases.
   lifecycle and permissions. Unknown IDs are refused rather than
   auto-registered. A leaked key is still the identity — rotation is the
   remedy.
-- **Signed, append-only audit log** — *Built, tamper-evident.* Every event
+- **Signed, tamper-evident audit log** — *Built, tamper-evident.* Every event
   carries a sequence number, the previous row's hash, a hash of its own
   facts, and an HMAC under a server-only secret. Editing, deleting, or
   forging a row becomes detectable. Not append-only — the table is still

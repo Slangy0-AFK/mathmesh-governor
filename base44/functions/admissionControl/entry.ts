@@ -13,6 +13,7 @@ export default async function(req: Request): Promise<Response> {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Admin only — admission changes agent counters and issues tickets.' }, { status: 403 });
 
     const body = await req.json();
     const agentId = typeof body.agentId === 'string' ? body.agentId.trim() : '';

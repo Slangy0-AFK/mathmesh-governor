@@ -18,6 +18,10 @@ export const base44 = createClient({
 });
 
 // Expose the SDK only in an explicitly configured evaluation deployment.
-if (typeof window !== 'undefined' && import.meta.env.VITE_E2E_EXPOSE_BASE44 === 'true') {
+if (
+  typeof window !== 'undefined' &&
+  import.meta.env.MODE === 'e2e' &&
+  import.meta.env.VITE_E2E_EXPOSE_BASE44 === 'true'
+) {
   window.__base44 = base44;
 }

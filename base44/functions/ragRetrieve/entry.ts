@@ -5,6 +5,7 @@ export default async function(req: Request): Promise<Response> {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Admin only — retrieval uses the app model account.' }, { status: 403 });
 
     const body = await req.json();
     const { query, action, model } = body;

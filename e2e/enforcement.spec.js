@@ -66,7 +66,7 @@ test.describe('Live backend enforcement', () => {
     await page.goto(baseURL || '/');
     const exposesClient = await page.evaluate(() => Boolean(window.__base44));
     if (!exposesClient) {
-      throw new Error('Enable VITE_E2E_EXPOSE_BASE44=true on the dedicated test deployment to run SDK checks.');
+      throw new Error('Build the dedicated test deployment with VITE_E2E_EXPOSE_BASE44=true and Vite mode e2e to run SDK checks.');
     }
     const email = page.getByLabel(/email/i).or(page.getByPlaceholder(/email/i)).first();
     const password = page.getByLabel(/password/i).or(page.getByPlaceholder(/password/i)).first();

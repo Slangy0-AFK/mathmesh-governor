@@ -63,6 +63,11 @@ need it for operations and review.
   verify. Without it, rows are still chained but reported as `unsigned`.
 - Enforcement is server-side and fail-closed: if the admission path is
   unreachable, requests are denied. There is no client-only mode that bypasses it.
+- The operator dashboard requires an authenticated Base44 administrator.
+  Harness data entities restrict create, read, update, and delete to admins;
+  model-spending and operator backend functions enforce the same admin check;
+  backend service-role operations remain server-side. Do not rely on hiding the
+  dashboard controls as an access boundary.
 - The egress proxy only covers traffic that passes through the app. Agents with
   their own network route are unaffected — that needs a sandbox below the app
   layer, which this app does not provide.
@@ -175,10 +180,11 @@ store; rotate it if it is lost or may have been exposed.
 The live E2E suite mutates test data and briefly toggles the global emergency
 stop. It requires explicit `E2E_RUN_LIVE=true` and `E2E_ALLOW_MUTATIONS=true`,
 credentials, and an HTTPS `E2E_BASE_URL`; it blocks the published production
-URL. The SDK-backed checks additionally require
-`VITE_E2E_EXPOSE_BASE44=true` on the test deployment build only. Verify that
-this flag is absent from production builds. Review the test report and confirm
-probe cleanup after every live run.
+URL. The SDK-backed checks additionally require a dedicated test build using both
+`VITE_E2E_EXPOSE_BASE44=true` and Vite mode `e2e` (for example,
+`VITE_E2E_EXPOSE_BASE44=true npm run build -- --mode e2e`). The client hook is
+not included in production-mode builds, even if the flag is set. Review the
+test report and confirm probe cleanup after every live run.
 
 Before accepting traffic or a lab run, verify the key requirement, per-agent
 permissions, request and estimated-token limits, global stop, egress behavior,
