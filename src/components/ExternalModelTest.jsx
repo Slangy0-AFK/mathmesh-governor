@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import ModelConnectionForm from '@/components/benchmark/ModelConnectionForm';
 import BenchmarkResults from '@/components/benchmark/BenchmarkResults';
@@ -9,7 +9,7 @@ export default function ExternalModelTest() {
   const [reports, setReports] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const load = async () => { setError(''); try { const r = await base44.functions.invoke('testExternalModel', { mode: 'manifest' }); setManifest(r.data); } catch (e) { setError(e?.response?.data?.error || 'Could not load benchmark.'); } };
+  const load = async () => { setError(''); try { const r = await apiClient.functions.invoke('testExternalModel', { mode: 'manifest' }); setManifest(r.data); } catch (e) { setError(e?.response?.data?.error || 'Could not load benchmark.'); } };
   useEffect(() => { load(); }, []);
   const run = async () => {
     setBusy(true); setError('');
@@ -19,7 +19,7 @@ export default function ExternalModelTest() {
         const submission = JSON.parse(connection.answers);
         request = { mode: 'submitted', model: connection.model, version: submission.version, answers: submission.answers };
       }
-      const r = await base44.functions.invoke('testExternalModel', request);
+      const r = await apiClient.functions.invoke('testExternalModel', request);
       setReports(previous => [...previous, r.data]);
     } catch (e) { setError(e?.response?.data?.error || e.message); }
     finally { setBusy(false); setConnection(current => ({ ...current, apiKey: '' })); }

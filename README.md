@@ -1,19 +1,14 @@
-## Published App
+## Self-Hosted Application
 
-[Open the live MathMesh Governor app](https://lean-math-mesh.base44.app)
+MathMesh Governor runs as a standalone Node.js API with PostgreSQL storage and
+a Vite/React dashboard. It does not require the Base44 SDK, hosted functions,
+hosted entities, or platform authentication. It is not independently assessed
+or certified; configure and operate it as security-sensitive software.
 
-This is a public demonstration, not an independently assessed production
-deployment. Do not submit secrets, sensitive prompts, or production traffic.
-The live site was updated on 2026-10-11. An unauthenticated browser now sees a
-sign-in screen rather than the Agent Identity Registry; harness data entities
-allow CRUD only to Base44 administrators. Anonymous SDK reads of all 11
-harness entities returned no records, and the production bundle does not
-expose the SDK client on `window.__base44`. `processWithSonnet` and
-`issueAgentKey` require an authenticated app administrator; model-spending,
-egress, admission, audit, and verification functions are also admin-gated.
-Only an authorized app administrator can use the operator dashboard. This
-reduces exposure; it is not independent security validation or a substitute
-for Base44 account and provider-side controls.
+The operator dashboard uses a server-configured admin account. Governance
+handlers remain server-side, and model credentials are read only from the
+server environment. See [OPERATIONS.md](OPERATIONS.md) for deployment and
+secret-handling requirements.
 
 ## What MathMesh Governor Does
 
@@ -51,8 +46,8 @@ For requests sent through this app, MathMesh Governor can help teams:
   to perform the requested action.
 - Set request and estimated usage limits for each agent to reduce unexpected
   or repeated use. These estimates do not set a hard limit on the provider's bill.
-- Detect repeated actions and reuse a response for an identical request, which
-  can avoid some unnecessary model calls.
+- Detect repeated actions before a model call. Response reuse is disabled until
+  cached answers can be rechecked against current grounding context.
 - Identify answers that are not supported by supplied information and send them
   for human review instead of returning them as verified.
 - Keep a record of requests and decisions so teams can review what happened.
@@ -86,7 +81,7 @@ The command prints pass/fail/error results and writes full prompts, reference an
 
 This is a small author-written public structured-output smoke test (ten cases), not an independent or held-out evaluation and not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
 
-## Live backend enforcement tests
+## Backend enforcement tests
 
 The enforcement suite contains 11 backend checks and two UI checks. It covers
 unknown and incorrectly keyed agents, frozen and revoked agents, action
@@ -97,12 +92,9 @@ that pages load; they do not verify live backend controls.
 
 These tests create and delete probe data, add a temporary spend record, and
 momentarily change the global emergency stop. Run them only against a dedicated
-HTTPS test deployment with synthetic data. The published production URL is
-blocked. The SDK-backed checks require that deployment to be built with
-`VITE_E2E_EXPOSE_BASE44=true` and Vite mode `e2e` (for example,
-`VITE_E2E_EXPOSE_BASE44=true npm run build -- --mode e2e`). The SDK client is
-exposed only in that explicit test mode; standard production builds do not
-expose it, even if the flag is accidentally set.
+HTTPS test deployment with synthetic data and a dedicated administrator. Build
+that deployment in Vite mode `e2e` to expose the local API test hook; normal
+builds never expose it.
 
 ```bash
 export E2E_RUN_LIVE=true
@@ -110,6 +102,7 @@ export E2E_ALLOW_MUTATIONS=true
 export E2E_BASE_URL="https://your-dedicated-test-deployment.example"
 export E2E_AUTH_EMAIL="your-test-admin@example.com"
 export E2E_AUTH_PASSWORD="your-test-password"
+npm run build -- --mode e2e
 npm run test:e2e:enforcement
 ```
 
@@ -124,19 +117,16 @@ Playwright report and probe-data cleanup before accepting a run.
 
 ```bash
 npm install
+cp .env.example .env
+# Set DATABASE_URL, AUTH_SECRET, HARNESS_SIGNING_SECRET,
+# INITIAL_ADMIN_EMAIL, INITIAL_ADMIN_PASSWORD, and MODEL_API_KEY in .env.
 npm run dev
 ```
 
-If you are running the Base44-managed workflow for the backend, the project
-also supports the Base44 CLI flow, which is the expected path for local app
-and server work in this repo:
-
-```bash
-base44 dev
-```
-
-The app exposes the governance UI in the browser and the server-side guardrails
-run in the Base44 functions under `base44/functions/`.
+The app exposes the governance UI and standalone server-side guardrails. Node
+22 or later and a PostgreSQL database are required. The initial administrator
+is created from `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` on first
+startup; public registration is disabled.
 
 ### 2) Register an agent and issue a key
 
@@ -196,8 +186,9 @@ curl -X POST http://localhost:5173/api/processWithSonnet \
   }'
 ```
 
-If the app is exposed through Base44 or another configured backend route, use
-that URL instead of the local Vite dev server.
+The standalone API listens on port 3001 by default, and Vite proxies `/api` to
+it on port 5173. Authenticate as an administrator to obtain a bearer token
+before calling protected endpoints.
 
 ### 4) Expected results
 
@@ -245,46 +236,17 @@ server-side, audited, and fail closed if the enforcement path is unreachable.
 | Output signature | Server-side | HMAC-SHA256 under a secret the client never sees |
 | Audit chain | Server-side | Sequence + prev-hash + row-hash + HMAC; tamper-evident |
 
-The audit and output signatures use `HARNESS_SIGNING_SECRET`, read at runtime
-from Base44's server-side secret store; the signing key is not stored in the
-audit table. The operator confirmed that this secret is configured for the
-published deployment.
+The audit and output signatures use `HARNESS_SIGNING_SECRET` from the server
+environment; the signing key is not stored in the audit table.
 
-### Detector sanity check (tuning set only)
+### Detector Evaluation
 
-One author-run sanity check compared the semantic drift detector with the
-keyword baseline on the same 24-case, hand-labeled tuning set. The threshold
-was selected using this set, so these figures are tuning results, not an
-unbiased estimate of performance:
-
-| Detector | TPR (drift caught) | FPR (false alarms) |
-|---|---:|---:|
-| Semantic (LLM judge) | 100.0% | 7.1% |
-| Keyword baseline | 70.0% | 28.6% |
-
-The following threshold sweep is on those same tuning cases:
-
-| Threshold | TPR | FPR | Missed | False alarms |
-|---:|---:|---:|---:|---:|
-| 0.2 | 100.0% | 21.4% | 0 | 3 |
-| 0.3 | 100.0% | 7.1% | 0 | 1 |
-| 0.4 | 100.0% | 7.1% | 0 | 1 |
-| 0.5 | 70.0% | 7.1% | 3 | 1 |
-| 0.6 | 70.0% | 7.1% | 3 | 1 |
-| 0.7 | 70.0% | 7.1% | 3 | 1 |
-| 0.8 | 70.0% | 7.1% | 3 | 1 |
-
-This is a small, single-author sanity check using an LLM judge, not a detector
-evaluation that supports general performance claims. The judge is
-non-deterministic, so repeated runs can differ. A separate 12-case held-out set
-exists in the project, but held-out TPR/FPR results are not reported here;
-therefore no held-out performance claim is made. These checks can help catch
-obvious regressions, but are not an independent review or evidence of behavior
-in other models or deployments.
-
-The tuning-set observation is that keyword matching flagged some on-task
-answers that used decoy vocabulary. It is not evidence that the semantic
-detector will perform similarly on unseen cases.
+No model-backed TPR/FPR result is presented here as a current measurement. The
+default threshold is provisional; run the evaluation against the held-out set
+with the configured provider and model before making any detector-accuracy
+claim. Failed judge attempts are reported separately and excluded from rate
+denominators. The 24-case tuning set and 12-case held-out set are both
+author-written, so neither is an independent benchmark.
 
 ### Status against the review
 
@@ -376,7 +338,7 @@ by the app itself.
 
 It is also not a complete security or compliance system. It depends on:
 
-- Base44 authentication and RLS configuration
+- Secure administrator authentication and PostgreSQL access controls
 - Correct production deployment and server-side enforcement
 - Secret management and key rotation procedures
 - Real external-service and egress testing

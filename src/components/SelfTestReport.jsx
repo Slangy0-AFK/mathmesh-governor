@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { buildSelfTestPdf } from '@/lib/selfTestPdf';
 import { buildPublicBriefPdf } from '@/lib/publicBriefPdf';
@@ -15,7 +15,7 @@ export default function SelfTestReport() {
     setError('');
     setReport(null);
     try {
-      const res = await base44.functions.invoke('harnessSelfTest', {});
+      const res = await apiClient.functions.invoke('harnessSelfTest', {});
       setReport(res.data);
     } catch (err) {
       setError(err?.response?.data?.error || err.message);

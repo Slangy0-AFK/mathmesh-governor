@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import health from '../base44/functions/health/entry.ts';
+import health from '../governor/functions/health/entry.ts';
 
 test('health endpoint reports liveness without exposing configuration', async () => {
   const response = health(new Request('https://example.test/api/health'));

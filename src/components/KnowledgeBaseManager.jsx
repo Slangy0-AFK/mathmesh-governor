@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,7 +20,7 @@ export default function KnowledgeBaseManager() {
 
   const loadEntries = async () => {
     try {
-      const items = await base44.entities.KnowledgeBase.list('-created_date', 100);
+      const items = await apiClient.entities.KnowledgeBase.list('-created_date', 100);
       setEntries(items);
     } catch (err) {
       // Entity might not be ready yet
@@ -34,7 +34,7 @@ export default function KnowledgeBaseManager() {
     setError('');
     try {
       const tags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
-      await base44.entities.KnowledgeBase.create({
+      await apiClient.entities.KnowledgeBase.create({
         title: form.title.trim(),
         content: form.content.trim(),
         source: form.source.trim(),
@@ -52,7 +52,7 @@ export default function KnowledgeBaseManager() {
 
   const handleDelete = async (id) => {
     try {
-      await base44.entities.KnowledgeBase.delete(id);
+      await apiClient.entities.KnowledgeBase.delete(id);
       setEntries(prev => prev.filter(e => e.id !== id));
     } catch (err) {
       setError(err.message);

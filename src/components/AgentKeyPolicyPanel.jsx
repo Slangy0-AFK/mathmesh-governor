@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Switch } from '@/components/ui/switch';
 import { Loader2, KeySquare, ShieldAlert } from 'lucide-react';
 
@@ -11,7 +11,7 @@ export default function AgentKeyPolicyPanel() {
 
   const load = async () => {
     try {
-      const rows = await base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1);
+      const rows = await apiClient.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1);
       setControl(rows[0] || null);
     } catch { /* fail silently */ }
   };
@@ -20,7 +20,7 @@ export default function AgentKeyPolicyPanel() {
     if (!control || busy) return;
     setBusy(true);
     try {
-      await base44.entities.HarnessControl.update(control.id, { require_agent_key: value });
+      await apiClient.entities.HarnessControl.update(control.id, { require_agent_key: value });
       await load();
     } catch { /* fail silently */ }
     setBusy(false);

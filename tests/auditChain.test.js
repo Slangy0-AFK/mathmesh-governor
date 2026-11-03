@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { appendAudit, verifyChain } from '../base44/shared/auditChain.ts';
+import { appendAudit, verifyChain } from '../governor/shared/auditChain.ts';
 
 function createAuditService() {
   const rows = [];

@@ -1,0 +1,1 @@
+process.env.HARNESS_SIGNING_SECRET ||= 'unit-test-secret-not-for-deployment';

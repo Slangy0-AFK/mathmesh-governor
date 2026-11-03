@@ -7,7 +7,7 @@ import {
   refundTokens,
   reserveTokens,
   windowSpend,
-} from '../base44/shared/tokenLedger.ts';
+} from '../governor/shared/tokenLedger.ts';
 
 function createService(spendRows = []) {
   const rows = [...spendRows];

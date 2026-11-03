@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -30,7 +30,7 @@ export default function AuditLogViewer() {
   const loadLogs = async () => {
     setIsLoading(true);
     try {
-      const result = await base44.entities.AuditLog.list('-created_date', 50);
+      const result = await apiClient.entities.AuditLog.list('-created_date', 50);
       setLogs(result);
     } catch (err) { /* fail silently */ }
     setIsLoading(false);

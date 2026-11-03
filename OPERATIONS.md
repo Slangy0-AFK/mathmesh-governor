@@ -26,18 +26,18 @@ through the chain verifier (a sequence gap), which is the intended property.
 
 ## Who can access stored prompts and outputs
 
-- **App users**: governed by Base44 authentication and Row-Level Security. The
-  dashboard surfaces are admin-gated where they spend credits or reveal controls.
+- **Administrators**: authenticated by server-issued bearer sessions. Entity CRUD
+  and protected functions enforce administrator role in the API.
 - **Admins**: can read and change every entity above, including raw payloads,
   withheld responses in the grounding queue, and audit history.
 - **Agents**: an agent sees only what the harness returns to it. Withheld
   responses are not returned to the calling agent; they land in the review queue.
-- **Base44 platform**: the app runs on Base44, so Base44 infrastructure has access
-  to stored data under the platform's own access and compliance controls.
+- **Database operators**: anyone with direct PostgreSQL access can bypass API
+  checks. Restrict credentials, network access, and backups accordingly.
 
 Treat stored prompts and responses as sensitive: they may contain user content.
-Apply RLS and least-privilege roles, and restrict admin access to the people who
-need it for operations and review.
+Restrict administrator access to the people who need it for operations and
+review. The generic PostgreSQL table does not apply row-level security.
 
 ## Key rotation
 
@@ -49,7 +49,8 @@ need it for operations and review.
   rotation is the remedy, not deletion of the agent (which would lose its history).
 - For a compromised identity, use the kill switch (freeze or revoke) instead of
   just rotating. Revoke is terminal until an operator reinstates it.
-- The audit signing secret (`HARNESS_SIGNING_SECRET`) is a platform secret. If it
+- The audit signing secret (`HARNESS_SIGNING_SECRET`) is a server environment
+  secret. If it
   is rotated, rows signed under the old secret will verify as `bad_signature`
   against the new one — re-signing historical rows is not supported, so rotate
   only when you accept that trade-off, or keep the old secret available for
@@ -57,22 +58,22 @@ need it for operations and review.
 
 ## Deployment requirements
 
-- The app is published on Base44 and served from there. There is no separate
-  server to host; the backend functions run on the platform.
-- `HARNESS_SIGNING_SECRET` must be set for audit-chain and output signatures to
-  verify. Without it, rows are still chained but reported as `unsigned`.
-- Enforcement is server-side and fail-closed: if the admission path is
-  unreachable, requests are denied. There is no client-only mode that bypasses it.
-- The operator dashboard requires an authenticated Base44 administrator.
-  Harness data entities restrict create, read, update, and delete to admins;
-  model-spending and operator backend functions enforce the same admin check;
-  backend service-role operations remain server-side. Do not rely on hiding the
-  dashboard controls as an access boundary.
-- The egress proxy only covers traffic that passes through the app. Agents with
-  their own network route are unaffected — that needs a sandbox below the app
-  layer, which this app does not provide.
-- Token limits are estimated (chars/4), not a provider bill. The platform does
-  not report provider usage, so treat every budget number as an estimate.
+- Run Node.js 22 or later with PostgreSQL. `npm run dev` starts the API and
+  Vite frontend; `npm start` starts the API and serves the production build.
+- Configure `DATABASE_URL`, `AUTH_SECRET` (at least 32 bytes),
+  `HARNESS_SIGNING_SECRET`, initial admin credentials, and model provider
+  credentials as server environment variables.
+- The initial admin is seeded on startup. Public registration is disabled.
+  Rotate `AUTH_SECRET` to invalidate existing bearer sessions.
+- Entity CRUD and protected functions check the authenticated administrator
+  role. The API does not provide database row-level security; direct SQL access
+  is privileged and must be restricted separately.
+- Keep PostgreSQL private, require TLS for remote database connections, and
+  terminate public TLS at a trusted reverse proxy.
+- Enforcement fails closed when admission is unavailable. The egress proxy
+  only covers traffic that passes through it; it does not sandbox agents.
+- Token limits are estimated (chars/4), not a provider bill. Configure provider
+  billing alerts and spend caps separately.
 
 ## Monitoring for failures
 
@@ -92,24 +93,15 @@ need it for operations and review.
   after any change to the detector or judge prompt. A drop in TPR or a rise in FPR
   on the held-out set is the signal that a change regressed detection.
 
-### Error tracking and metrics
+### Error tracking and health
 
-- Configure `VITE_SENTRY_DSN` in each frontend build to enable browser error
-  reporting. It is a public project identifier and will be present in the bundle;
-  do not put credentials in `VITE_*` variables.
-- Store `SENTRY_DSN` and `APP_ENV` as Base44 server secrets to enable exception
-  reporting for `processWithSonnet`, `egressProxy`, and the metrics exporter.
-  Events exclude default PII; backend logs contain JSON error type/function fields
-  and do not include request payloads.
-- Store a high-entropy `PROMETHEUS_SCRAPE_TOKEN` as a Base44 secret and the same
-  value in the Prometheus scraper's secret store. `GET /api/metrics` requires it
-  as a bearer token and emits gauges aggregated over at most the newest 1,000
-  retained `PipelineRun` records. These are retained-record snapshots, not
-  lifetime counters or provider billing data. Scrape no more frequently than
-  once per minute to bound database reads.
-- `GET /api/health` is a liveness check only. A successful response means the
-  function runtime responded; it does not prove model providers or data services
-  are healthy.
+- The API writes structured error type and function information to standard
+  error without including request payloads. Route logs to the operator's chosen
+  protected log store.
+- `VITE_SENTRY_DSN` can enable optional browser error reporting. It is public
+  configuration, not a credential; never put secrets in `VITE_*` variables.
+- `GET /api/health` checks API and database liveness. It does not prove model
+  provider availability.
 
 Example Prometheus scrape configuration (keep the token in a mounted secret
 file, not in source control):
@@ -117,18 +109,15 @@ file, not in source control):
 ```yaml
 scrape_configs:
   - job_name: mathmesh-governor
-    metrics_path: /api/metrics
+    metrics_path: /api/health
     scheme: https
-    authorization:
-      type: Bearer
-      credentials_file: /etc/prometheus/secrets/mathmesh_scrape_token
     static_configs:
-      - targets: [lean-math-mesh.base44.app]
+      - targets: [your-governor-host.example]
 ```
 
 ## Incident response
 
-1. Triage the alert in Sentry or the Base44 function logs. Record the affected
+1. Triage the alert in the configured browser monitor or protected server logs. Record the affected
   function, time window, release revision, and relevant audit sequence numbers;
   do not copy prompts, keys, or raw user content into an incident ticket.
 2. If an agent is misbehaving, freeze it (reversible) or revoke it (terminal)
@@ -151,25 +140,20 @@ scrape_configs:
   issue is code-related. Check entity/schema changes and secrets separately;
   restoring code does not automatically reverse data changes or rotate secrets.
 3. Revert the bad change through a reviewed Git revert commit, run CI, and deploy
-  that known-good revision to the intended Base44 app using the normal release
-  procedure (`npx base44 deploy --build -y`). Confirm the CLI is linked to the
-  correct environment before deploying.
+  the API and frontend together using the operator's documented release process.
 4. Verify `/api/health`, sign-in, admission denial/allow behavior, the audit
   chain, and the global stop in the target environment. Keep the stop engaged
   until those checks pass, then release it under operator review.
 5. Record the deployed revision, verification evidence, and any manual data or
   secret recovery. If rollback does not restore safe operation, leave the stop
-  engaged and escalate to Base44 support and the incident owner.
+  engaged and escalate to the incident owner.
 
-There is no automated deployment or platform rollback workflow in this
-repository today. Treat entity/data migrations as forward-only until a tested
-recovery plan exists.
+There is no automated deployment or rollback workflow in this repository.
+Treat database migrations as forward-only until a tested recovery plan exists.
 ## External Evaluation Deployment
 
-Use a separate Base44 deployment, synthetic data, and dedicated reviewer
-accounts for external testing. Confirm authentication, entity roles, row-level
-access rules, and reviewer access in that deployment; this repository cannot
-prove the deployed permissions are correct. Do not share production
+Use a separate deployment, PostgreSQL database, synthetic data, and dedicated
+administrator account for external testing. Do not share production
 administrator credentials with reviewers.
 
 Keep `HARNESS_SIGNING_SECRET` and provider credentials in server-side secret
@@ -179,12 +163,10 @@ store; rotate it if it is lost or may have been exposed.
 
 The live E2E suite mutates test data and briefly toggles the global emergency
 stop. It requires explicit `E2E_RUN_LIVE=true` and `E2E_ALLOW_MUTATIONS=true`,
-credentials, and an HTTPS `E2E_BASE_URL`; it blocks the published production
-URL. The SDK-backed checks additionally require a dedicated test build using both
-`VITE_E2E_EXPOSE_BASE44=true` and Vite mode `e2e` (for example,
-`VITE_E2E_EXPOSE_BASE44=true npm run build -- --mode e2e`). The client hook is
-not included in production-mode builds, even if the flag is set. Review the
-test report and confirm probe cleanup after every live run.
+credentials, and an HTTPS `E2E_BASE_URL`. Build that dedicated test deployment
+with `npm run build -- --mode e2e` to expose the local API test hook. Standard
+builds never include the hook. Review the report and confirm probe cleanup
+after each run.
 
 Before accepting traffic or a lab run, verify the key requirement, per-agent
 permissions, request and estimated-token limits, global stop, egress behavior,

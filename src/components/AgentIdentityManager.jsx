@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,7 @@ export default function AgentIdentityManager({ onKeyIssued }) {
   const loadAgents = async () => {
     setIsLoading(true);
     try {
-      const result = await base44.entities.AgentIdentity.list('-created_date', 50);
+      const result = await apiClient.entities.AgentIdentity.list('-created_date', 50);
       setAgents(result);
     } catch (err) { /* fail silently */ }
     setIsLoading(false);
@@ -42,7 +42,7 @@ export default function AgentIdentityManager({ onKeyIssued }) {
   const handleRegister = async () => {
     if (!newAgentId.trim()) return;
     try {
-      await base44.entities.AgentIdentity.create({
+      await apiClient.entities.AgentIdentity.create({
         agent_id: newAgentId.trim(), role: newAgentRole, status: 'active',
         allowed_actions: [], session_nonce: '', total_runs: 0, halt_count: 0, drift_count: 0,
       });
@@ -55,7 +55,7 @@ export default function AgentIdentityManager({ onKeyIssued }) {
     setIssuing(agent.agent_id);
     setIssued(null);
     try {
-      const res = await base44.functions.invoke('issueAgentKey', { agentId: agent.agent_id });
+      const res = await apiClient.functions.invoke('issueAgentKey', { agentId: agent.agent_id });
       setIssued(res.data);
       onKeyIssued?.(res.data.agentId, res.data.key);
       loadAgents();
@@ -67,14 +67,14 @@ export default function AgentIdentityManager({ onKeyIssued }) {
 
   const handleRoleChange = async (agent, newRole) => {
     try {
-      await base44.entities.AgentIdentity.update(agent.id, { role: newRole });
+      await apiClient.entities.AgentIdentity.update(agent.id, { role: newRole });
       loadAgents();
     } catch (err) { /* fail silently */ }
   };
 
   const handleKillSwitch = async (agent) => {
     try {
-      await base44.entities.AgentIdentity.update(agent.id, {
+      await apiClient.entities.AgentIdentity.update(agent.id, {
         status: 'revoked', revoked_reason: 'Manual kill switch activation',
       });
       loadAgents();
@@ -83,7 +83,7 @@ export default function AgentIdentityManager({ onKeyIssued }) {
 
   const handleUnfreeze = async (agent) => {
     try {
-      await base44.entities.AgentIdentity.update(agent.id, {
+      await apiClient.entities.AgentIdentity.update(agent.id, {
         status: 'active', revoked_reason: '',
       });
       loadAgents();

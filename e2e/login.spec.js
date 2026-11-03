@@ -2,11 +2,16 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Authentication boundary', () => {
   test('root entry is reachable', async ({ page }) => {
+    await page.route('**/api/auth/me', (route) => route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'Unauthorized.' }),
+    }));
     const response = await page.goto('/');
 
     expect(response?.status()).toBeLessThan(500);
     await expect(page.locator('body')).toBeVisible();
-    await expect(page.getByText(/not found|404/i)).toHaveCount(0);
+    await expect(page.getByLabel(/email/i)).toBeVisible();
   });
 
   test('invalid credentials are rejected when credentials are configured', async ({ page }) => {

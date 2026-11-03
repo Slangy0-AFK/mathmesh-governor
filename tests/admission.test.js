@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { admitRequest, consumeTicket } from '../base44/shared/admission.ts';
-import { sha256Hex } from '../base44/shared/agentKeys.ts';
-import { escalateOnDrift } from '../base44/shared/enforcement.ts';
-import { POLICY_DEFAULTS } from '../base44/shared/harnessPolicy.ts';
+import { admitRequest, consumeTicket } from '../governor/shared/admission.ts';
+import { sha256Hex } from '../governor/shared/agentKeys.ts';
+import { escalateOnDrift } from '../governor/shared/enforcement.ts';
+import { POLICY_DEFAULTS } from '../governor/shared/harnessPolicy.ts';
 
 const VALID_KEY = 'mmk_test_key_for_unit_tests_only';
 const VALID_KEY_HASH = await sha256Hex(VALID_KEY);

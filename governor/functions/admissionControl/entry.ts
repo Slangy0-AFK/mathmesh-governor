@@ -1,0 +1,43 @@
+import { createClientFromRequest } from '../../../server/runtime.js';
+import { admitRequest } from '../../shared/admission.ts';
+
+/**
+ * Admission control endpoint — a thin wrapper over the shared admission gate.
+ *
+ * The decision itself lives in shared/admission.ts because every function that can
+ * spend money calls it directly. Skipping this endpoint no longer skips the gate:
+ * it only means the spend path runs admission itself instead.
+ */
+export default async function(req: Request): Promise<Response> {
+  try {
+    const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    if (user.role !== 'admin') return Response.json({ error: 'Admin only — admission changes agent counters and issues tickets.' }, { status: 403 });
+
+    const body = await req.json();
+    const agentId = typeof body.agentId === 'string' ? body.agentId.trim() : '';
+    const action = typeof body.action === 'string' ? body.action.trim() : '';
+
+    if (!agentId || !action) {
+      return Response.json({ error: 'agentId and action are required' }, { status: 400 });
+    }
+
+    const verdict = await admitRequest(base44.asServiceRole, {
+      agentId, action,
+      sessionNonce: typeof body.sessionNonce === 'string' ? body.sessionNonce : '',
+      agentKey: typeof body.agentKey === 'string' ? body.agentKey : '',
+    });
+
+    // Never hand the stored key hash back to a caller. It is not the key, but it is
+    // the only thing an offline guessing attack would need to check against.
+    if (verdict.agent) {
+      const { key_hash, ...safeAgent } = verdict.agent;
+      verdict.agent = safeAgent;
+    }
+
+    return Response.json(verdict);
+  } catch (error) {
+    return Response.json({ error: (error as Error).message }, { status: 500 });
+  }
+}

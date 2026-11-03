@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { MathMeshGovernor } from '@/lib/mathMeshGovernor';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import PipelineStepCard from '@/components/PipelineStepCard';
 import AgentStatePanel from '@/components/AgentStatePanel';
 import RunLogEntry from '@/components/RunLogEntry';
@@ -117,7 +117,7 @@ export default function Home() {
 
   const loadHistory = async () => {
     try {
-      const runs = await base44.entities.PipelineRun.list('-created_date', 50);
+      const runs = await apiClient.entities.PipelineRun.list('-created_date', 50);
       setRunLog(runs.map(r => ({
         status: r.status,
         haltedAt: r.halted_at || null,
@@ -156,10 +156,10 @@ export default function Home() {
     try {
       let runKey = agentKey;
       if (!runKey) {
-        const identities = await base44.entities.AgentIdentity.filter({ agent_id: agentId }, '-created_date', 1);
+        const identities = await apiClient.entities.AgentIdentity.filter({ agent_id: agentId }, '-created_date', 1);
         const identity = identities[0];
         if (identity && !identity.key_hash) {
-          const keyResponse = await base44.functions.invoke('issueAgentKey', { agentId });
+          const keyResponse = await apiClient.functions.invoke('issueAgentKey', { agentId });
           runKey = keyResponse.data.key;
           setAgentKey(runKey);
         }
@@ -180,7 +180,7 @@ export default function Home() {
 
       // Persist to database
       try {
-        await base44.entities.PipelineRun.create({
+        await apiClient.entities.PipelineRun.create({
           agent_id: agentId,
           action,
           raw_payload: payload,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Gauge, RefreshCw } from 'lucide-react';
 
@@ -21,8 +21,8 @@ export default function TokenBudgetPanel() {
     setLoading(true);
     try {
       const [spend, control] = await Promise.all([
-        base44.entities.TokenSpend.list('-created_date', 300),
-        base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1),
+        apiClient.entities.TokenSpend.list('-created_date', 300),
+        apiClient.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1),
       ]);
       setRows(spend.filter((r) => r.phase !== 'refunded'));
       setPolicy(control[0] || null);

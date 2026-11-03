@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkEgressPermission, parseEgressTarget } from '../base44/shared/egressPolicy.ts';
+import { checkEgressPermission, parseEgressTarget } from '../governor/shared/egressPolicy.ts';
 
 test('egress parsing allows HTTPS requests to fully qualified hosts', () => {
   const result = parseEgressTarget('https://api.example.com/v1/items', 'get');

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -19,7 +19,7 @@ export default function EgressAllowlistPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      setHosts(await base44.entities.EgressAllowlist.list('-created_date', 50));
+      setHosts(await apiClient.entities.EgressAllowlist.list('-created_date', 50));
     } catch { /* fail silently */ }
     setLoading(false);
   };
@@ -28,7 +28,7 @@ export default function EgressAllowlistPanel() {
     const host = newHost.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     if (!host) return;
     try {
-      await base44.entities.EgressAllowlist.create({
+      await apiClient.entities.EgressAllowlist.create({
         host, note: newNote.trim(), allowed_methods: ['GET'], enabled: true, request_count: 0,
       });
       setNewHost(''); setNewNote('');
@@ -39,17 +39,17 @@ export default function EgressAllowlistPanel() {
   const toggleMethod = async (entry, method) => {
     const current = Array.isArray(entry.allowed_methods) ? entry.allowed_methods : ['GET'];
     const next = current.includes(method) ? current.filter((m) => m !== method) : [...current, method];
-    await base44.entities.EgressAllowlist.update(entry.id, { allowed_methods: next });
+    await apiClient.entities.EgressAllowlist.update(entry.id, { allowed_methods: next });
     load();
   };
 
   const toggleEnabled = async (entry, value) => {
-    await base44.entities.EgressAllowlist.update(entry.id, { enabled: value });
+    await apiClient.entities.EgressAllowlist.update(entry.id, { enabled: value });
     load();
   };
 
   const remove = async (entry) => {
-    await base44.entities.EgressAllowlist.delete(entry.id);
+    await apiClient.entities.EgressAllowlist.delete(entry.id);
     load();
   };
 

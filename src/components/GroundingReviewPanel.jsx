@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { FileSearch, RefreshCw, Check, X, Quote } from 'lucide-react';
 
@@ -19,7 +19,7 @@ export default function GroundingReviewPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      setItems(await base44.entities.GroundingReview.list('-created_date', 40));
+      setItems(await apiClient.entities.GroundingReview.list('-created_date', 40));
       setError('');
     } catch (err) {
       setItems([]);
@@ -32,8 +32,8 @@ export default function GroundingReviewPanel() {
   useEffect(() => { load(); }, []);
 
   const review = async (id, status) => {
-    const me = await base44.auth.me();
-    await base44.entities.GroundingReview.update(id, { status, reviewed_by: me?.email || '' });
+    const me = await apiClient.auth.me();
+    await apiClient.entities.GroundingReview.update(id, { status, reviewed_by: me?.email || '' });
     load();
   };
 

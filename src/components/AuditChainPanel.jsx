@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Link2, ShieldCheck, ShieldAlert, AlertTriangle } from 'lucide-react';
 
@@ -23,7 +23,7 @@ export default function AuditChainPanel() {
     setError('');
     setResult(null);
     try {
-      const res = await base44.functions.invoke('verifyAuditChain', { limit: 500 });
+      const res = await apiClient.functions.invoke('verifyAuditChain', { limit: 500 });
       setResult(res.data);
     } catch (err) {
       setError(err?.response?.data?.error || err.message);

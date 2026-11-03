@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CASES, buildReport, scoreAnswer, VERSION } from '../base44/shared/modelBenchmark.js';
+import { CASES, buildReport, scoreAnswer, VERSION } from '../governor/shared/modelBenchmark.js';
 
 test('reference benchmark reports its version and fixed case count', () => {
   assert.equal(VERSION, 'mathmesh-reference-v3');

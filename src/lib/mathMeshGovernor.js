@@ -17,8 +17,9 @@
  * OUTPUT, not action.
  */
 
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { sha256Hex } from '@/lib/outputAttribution';
+import { evaluateVoteParity } from '../../governor/shared/mathChecks.ts';
 
 export class MathMeshGovernor {
   constructor(tokenLimit = 50000) {
@@ -59,26 +60,8 @@ export class MathMeshGovernor {
     return compressed.replace(/\s+/g, ' ').trim();
   }
 
-  hashString(str) {
-    let hash = 5381;
-    for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) + hash) + str.charCodeAt(i);
-      hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36);
-  }
-
   evaluateMatrixVoting(triadVotes) {
-    if (!triadVotes || triadVotes.length === 0) {
-      return { aligned: false, reason: 'Base 8/10: No votes provided.' };
-    }
-    const baseModulus = triadVotes[0] % 2;
-    for (const vote of triadVotes) {
-      if (vote % 2 !== baseModulus) {
-        return { aligned: false, reason: `Base 8/10: Modulus Mismatch — out-of-sync vector: ${vote}`, mismatchedVote: vote };
-      }
-    }
-    return { aligned: true, reason: null };
+    return evaluateVoteParity(triadVotes);
   }
 
   // === LLM GATES ===
@@ -86,36 +69,14 @@ export class MathMeshGovernor {
   async base12SemanticDedup(agentId, currentAction) {
     const recentActions = this.actionHistory[agentId] || [];
     if (recentActions.length === 0) {
-      return { isDuplicate: false, reason: 'No history to compare' };
+      return { isDuplicate: false, checked: true, reason: 'No history to compare' };
     }
     try {
-      const res = await base44.functions.invoke('semanticDedupCheck', { currentAction, recentActions, agentId });
+      const res = await apiClient.functions.invoke('semanticDedupCheck', { currentAction, recentActions, agentId });
       return res.data;
     } catch (err) {
-      return { isDuplicate: false, reason: `Base 12: LLM check failed — ${err.message}` };
+      return { isDuplicate: false, checked: false, reason: `Base 12: LLM check failed — ${err.message}` };
     }
-  }
-
-  async checkCache(action, compressedPayload) {
-    const cacheKey = `${action}::${this.hashString(compressedPayload.toLowerCase())}`;
-    try {
-      const results = await base44.entities.ResponseCache.filter({ cache_key: cacheKey }, '-created_date', 1);
-      if (results.length > 0) {
-        await base44.entities.ResponseCache.update(results[0].id, { hit_count: (results[0].hit_count || 0) + 1 });
-        return results[0].response;
-      }
-    } catch (err) { /* fail open */ }
-    return null;
-  }
-
-  async storeInCache(action, compressedPayload, response, agentId) {
-    const cacheKey = `${action}::${this.hashString(compressedPayload.toLowerCase())}`;
-    try {
-      await base44.entities.ResponseCache.create({
-        cache_key: cacheKey, agent_id: agentId, action,
-        compressed_payload: compressedPayload, response, hit_count: 0,
-      });
-    } catch (err) { /* fail silently */ }
   }
 
   // === HARNESS LAYERS ===
@@ -146,7 +107,7 @@ export class MathMeshGovernor {
    */
   async logAudit(eventType, agentId, gate, details, opts = {}) {
     try {
-      await base44.functions.invoke('recordAudit', {
+      await apiClient.functions.invoke('recordAudit', {
         event_type: eventType,
         agent_id: agentId,
         session_nonce: opts.sessionNonce || '',
@@ -164,7 +125,7 @@ export class MathMeshGovernor {
   /** Operator kill switch — decided and applied server-side, admin only. */
   async killSwitch(agentId, reason, mode = 'revoke') {
     try {
-      const res = await base44.functions.invoke('killSwitch', { mode, agentId, reason });
+      const res = await apiClient.functions.invoke('killSwitch', { mode, agentId, reason });
       this.resetAgent(agentId);
       return { success: true, message: `Agent ${agentId}: ${mode} applied.`, data: res.data };
     } catch (err) {
@@ -185,7 +146,7 @@ export class MathMeshGovernor {
     // decided on the server before a single token is spent.
     let admission;
     try {
-      const res = await base44.functions.invoke('admissionControl', { agentId, action: currentAction, sessionNonce, agentKey });
+      const res = await apiClient.functions.invoke('admissionControl', { agentId, action: currentAction, sessionNonce, agentKey });
       admission = res.data;
     } catch (err) {
       const msg = err?.response?.data?.error || err.message;
@@ -245,6 +206,11 @@ export class MathMeshGovernor {
     // Step 4: Base 12 — Semantic Dedup (LLM gate)
     if (enableLLM) {
       const dedupResult = await this.base12SemanticDedup(agentId, currentAction);
+      if (!dedupResult || dedupResult.checked === false || typeof dedupResult.isDuplicate !== 'boolean') {
+        const detail = dedupResult?.reason || 'Semantic deduplication returned no usable verdict.';
+        steps.push({ step: 4, gate: 'Base 12 — Semantic Dedup', passed: false, detail: `NOT CHECKED — ${detail}` });
+        return { status: 'HALTED', haltedAt: 'Base 12', message: `Execution halted: duplicate detection did not complete. ${detail}`, steps, cleanData: base2Result.cleanedText, estimatedTokensSaved: 0, sessionNonce, agentIdentity };
+      }
       const isDup = dedupResult.isDuplicate;
       steps.push({
         step: 4, gate: 'Base 12 — Semantic Dedup',
@@ -286,25 +252,11 @@ export class MathMeshGovernor {
     let outputSignature = '';
 
     if (enableLLM) {
-      // Step 6: Cache Check
-      const cachedResponse = await this.checkCache(currentAction, compressedPayload);
-      if (cachedResponse !== null) {
-        cacheHit = true;
-        steps.push({ step: 6, gate: 'Cache Check — Response Memoization', passed: true, detail: 'CACHE HIT — returning cached response. 0 LLM tokens spent.' });
-        await this.logAudit('CACHE_HIT', agentId, 'Cache', `Cache hit for action "${currentAction}"`, { sessionNonce, action: currentAction });
-        const totalSaved = compressionSaved + base2Result.cleanedText.length + cachedResponse.length;
-        const cachedHash = await this.attributeOutput(agentId, sessionNonce, currentAction, cachedResponse);
-        return {
-          status: 'PASSED', haltedAt: null, message: 'Cache hit — response served from memoization cache. 0 LLM tokens spent.',
-          cleanData: base2Result.cleanedText, compressedPayload, compressionSaved, llmResponse: cachedResponse, cacheHit: true,
-          outputHash: cachedHash, steps, estimatedTokensSaved: totalSaved, sessionNonce, agentIdentity,
-        };
-      }
-      steps.push({ step: 6, gate: 'Cache Check — Response Memoization', passed: true, detail: 'Cache miss — proceeding to RAG retrieval + LLM processing.' });
+      steps.push({ step: 6, gate: 'Response Cache', passed: true, detail: 'Response reuse is disabled so every answer is judged against the current context.' });
 
       // Step 7: RAG — Context Retrieval
       try {
-        const ragRes = await base44.functions.invoke('ragRetrieve', { query: compressedPayload, action: currentAction });
+        const ragRes = await apiClient.functions.invoke('ragRetrieve', { query: compressedPayload, action: currentAction });
         ragContext = ragRes.data.context || '';
         ragSources = ragRes.data.sources || [];
         steps.push({
@@ -317,7 +269,7 @@ export class MathMeshGovernor {
 
       // Step 8: LLM — Processing (embeds the decoy canary)
       try {
-        const res = await base44.functions.invoke('processWithSonnet', {
+        const res = await apiClient.functions.invoke('processWithSonnet', {
           payload: compressedPayload, action: currentAction, agentId, context: ragContext,
           sessionNonce, agentKey,
           // One-time ticket from admission. Without it the model function runs
@@ -336,7 +288,7 @@ export class MathMeshGovernor {
 
         // Step 9: Tripwire — SERVER-ENFORCED drift detection + kill switch
         try {
-          const tripRes = await base44.functions.invoke('tripwireCheck', {
+          const tripRes = await apiClient.functions.invoke('tripwireCheck', {
             response: llmResponse, agentId, sessionNonce, action: currentAction, decoyIds,
             task: compressedPayload,
             // The same context the model was given, so claims can be checked against it.
@@ -350,6 +302,21 @@ export class MathMeshGovernor {
           const kwNote = tripRes.data.keywordWouldHaveFired
             ? ` (Old keyword detector would have fired here on: ${(tripRes.data.keywordMatchedTerms || []).join(', ')}.)`
             : '';
+          if (tripRes.data.detectorError) {
+            steps.push({
+              step: 9, gate: 'Tripwire — Drift Detection', passed: false,
+              detail: `NOT CHECKED — ${tripRes.data.detectorError}. Output withheld because this run has no drift verdict.${kwNote}`,
+            });
+            return {
+              status: 'HALTED', haltedAt: 'Tripwire',
+              message: `Output withheld: drift detection was not completed. ${tripRes.data.detectorError}`,
+              steps, cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,
+              ragContext, ragSources, grounding, outputWithheld: true, serverEnforced: true,
+              budget, tokensSpent, judgeTokens,
+              outputHash: await this.attributeOutput(agentId, sessionNonce, currentAction, llmResponse),
+              estimatedTokensSaved: compressionSaved, sessionNonce, agentIdentity,
+            };
+          }
           if (tripRes.data.drift) {
             driftDetected = true;
             driftNonce = tripRes.data.nonce;
@@ -398,13 +365,18 @@ export class MathMeshGovernor {
             };
           }
         } catch (err) {
-          steps.push({ step: 9, gate: 'Tripwire — Drift Detection', passed: false, detail: `Tripwire check failed: ${err.message}. Proceeding (fail-open).` });
+          steps.push({ step: 9, gate: 'Tripwire — Drift Detection', passed: false, detail: `Tripwire check failed: ${err.message}. Output withheld because no verdict is available.` });
+          return {
+            status: 'HALTED', haltedAt: 'Tripwire',
+            message: `Output withheld: drift detection could not be completed. ${err.message}`,
+            steps, cleanData: base2Result.cleanedText, compressedPayload, compressionSaved,
+            ragContext, ragSources, outputWithheld: true, serverEnforced: true,
+            budget, tokensSpent,
+            outputHash: await this.attributeOutput(agentId, sessionNonce, currentAction, llmResponse),
+            estimatedTokensSaved: compressionSaved, sessionNonce, agentIdentity,
+          };
         }
 
-        // Step 11: Cache Store — only reached by an output that passed both verdicts,
-        // so a withheld or drifted answer never becomes a cached one.
-        await this.storeInCache(currentAction, compressedPayload, llmResponse, agentId);
-        steps.push({ step: 11, gate: 'Cache Store — Response Memoization', passed: true, detail: 'Response cached for future calls with same action + payload fingerprint.' });
       } catch (err) {
         steps.push({ step: 8, gate: 'LLM — Processing', passed: false, detail: `LLM processing failed: ${err.message}` });
         return {

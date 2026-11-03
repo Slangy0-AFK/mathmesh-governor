@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Loader2, Target, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const SETS = [
-  { value: 'tuning', label: 'Tuning set (24)' },
-  { value: 'heldout', label: 'Held-out set (12)' },
-  { value: 'both', label: 'All (36)' },
+  { value: 'tuning', label: 'Tuning set' },
+  { value: 'heldout', label: 'Held-out set' },
+  { value: 'both', label: 'All cases' },
 ];
 
 export default function DriftEvaluationPanel() {
@@ -21,7 +21,7 @@ export default function DriftEvaluationPanel() {
 
   const load = async () => {
     try {
-      const rows = await base44.entities.DriftEvalResult.list('-created_date', 1);
+      const rows = await apiClient.entities.DriftEvalResult.list('-created_date', 1);
       setLatest(rows[0] || null);
     } catch {
       setLatest(null);
@@ -33,7 +33,7 @@ export default function DriftEvaluationPanel() {
     setIsRunning(true);
     setError('');
     try {
-      await base44.functions.invoke('runDriftEval', { set: evalSet, repeats: Number(repeats) });
+      await apiClient.functions.invoke('runDriftEval', { set: evalSet, repeats: Number(repeats) });
       await load();
     } catch (err) {
       setError(err?.response?.data?.error || err.message || 'Evaluation failed.');
@@ -41,7 +41,7 @@ export default function DriftEvaluationPanel() {
     setIsRunning(false);
   };
 
-  const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  const pct = (v) => (typeof v === 'number' ? `${(v * 100).toFixed(1)}%` : '—');
   const fmt = (v) => (typeof v === 'number' ? v.toFixed(3) : '—');
 
   return (
@@ -129,7 +129,7 @@ export default function DriftEvaluationPanel() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <Metric
               label={`TPR (drift caught)${latest.repeats > 1 ? ' · mean' : ''}`}
               value={pct(latest.tpr_mean ?? latest.tpr)}
@@ -144,6 +144,7 @@ export default function DriftEvaluationPanel() {
             />
             <Metric label="Threshold" value={String(latest.threshold)} tone="text-slate-700" />
             <Metric label="Labeled cases" value={String(latest.total_cases)} tone="text-slate-700" />
+            <Metric label="Scored (repeat 1)" value={`${latest.evaluated_cases_first_repeat ?? latest.total_cases}/${latest.total_cases}`} tone="text-slate-700" />
           </div>
 
           {/* Per-run variance */}
@@ -166,10 +167,10 @@ export default function DriftEvaluationPanel() {
             </p>
             <div className="flex gap-6 text-xs">
               <span className="text-slate-600">
-                TPR <span className="font-bold text-slate-800">{pct(latest.keyword_baseline_tpr || 0)}</span>
+                TPR <span className="font-bold text-slate-800">{pct(latest.keyword_baseline_tpr)}</span>
               </span>
               <span className="text-slate-600">
-                FPR <span className="font-bold text-red-600">{pct(latest.keyword_baseline_fpr || 0)}</span>
+                FPR <span className="font-bold text-red-600">{pct(latest.keyword_baseline_fpr)}</span>
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed">
@@ -178,7 +179,7 @@ export default function DriftEvaluationPanel() {
             </p>
           </div>
 
-          {latest.threshold_sweep?.length > 1 &&
+          {latest.threshold_sweep?.length > 1 && latest.threshold_sweep.every((row) => typeof row.tpr === 'number' && typeof row.fpr === 'number') &&
             new Set(latest.threshold_sweep.map((r) => `${r.tpr}|${r.fpr}`)).size === 1 && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 leading-relaxed">
               The sweep is flat — every threshold gives identical results. The judge is returning
@@ -221,18 +222,20 @@ export default function DriftEvaluationPanel() {
             </div>
           )}
 
-          {latest.case_results?.some((c) => !c.correct) && (
+          {latest.case_results?.some((c) => c.correct !== true) && (
             <div>
               <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
                 <AlertTriangle className="w-3 h-3 text-amber-500" />
-                Cases the detector got wrong
+                Misses and judge errors
               </p>
               <div className="space-y-1.5">
-                {latest.case_results.filter((c) => !c.correct).map((c) => (
+                {latest.case_results.filter((c) => c.correct !== true).map((c) => (
                   <div key={c.case_id} className="text-xs bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                     <span className="font-mono text-slate-700">{c.case_id}</span>
                     <span className="text-slate-500">
-                      {' '}— expected {c.expected_drift ? 'drift' : 'clean'}, scored {c.score?.toFixed(2)}
+                      {c.detector_error
+                        ? ` — judge error; excluded from rate calculations: ${c.detector_error}`
+                        : ` — expected ${c.expected_drift ? 'drift' : 'clean'}, scored ${c.score?.toFixed(2)}`}
                     </span>
                     <p className="text-slate-500 mt-0.5">{c.note}</p>
                   </div>
@@ -243,8 +246,8 @@ export default function DriftEvaluationPanel() {
 
           {latest.errors > 0 && (
             <p className="text-xs text-red-600">
-              {latest.errors} case(s) the detector failed to score. Those are counted as
-              not-detected, not silently dropped.
+              {latest.errors} judge attempt(s) failed. Failed attempts are excluded from TPR/FPR
+              denominators, not counted as clean or drift.
             </p>
           )}
 

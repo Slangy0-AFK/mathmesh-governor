@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,7 @@ export default function KillSwitchPanel({ onChange }) {
 
   const load = async () => {
     try {
-      const rows = await base44.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1);
+      const rows = await apiClient.entities.HarnessControl.filter({ singleton_key: 'GLOBAL' }, '-created_date', 1);
       if (rows.length > 0) {
         setPolicy(rows[0]);
         setForm({
@@ -38,7 +38,7 @@ export default function KillSwitchPanel({ onChange }) {
     setBusy(true);
     setError('');
     try {
-      await base44.functions.invoke('killSwitch', payload);
+      await apiClient.functions.invoke('killSwitch', payload);
       await load();
       onChange?.();
     } catch (err) {

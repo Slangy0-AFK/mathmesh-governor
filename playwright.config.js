@@ -17,7 +17,7 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev -- --host 127.0.0.1',
+        command: 'npm run dev:e2e',
         url: 'http://localhost:5173',
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

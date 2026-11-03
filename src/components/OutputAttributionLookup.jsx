@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { apiClient } from '@/api/appClient';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Fingerprint, Search, Loader2, BadgeCheck, ShieldAlert } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function OutputAttributionLookup() {
     setBusy(true);
     setResult(null);
     try {
-      const res = await base44.functions.invoke('verifyOutput', { text });
+      const res = await apiClient.functions.invoke('verifyOutput', { text });
       setResult(res.data);
     } catch (err) {
       setResult({ error: err?.response?.data?.error || err.message });
