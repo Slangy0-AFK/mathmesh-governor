@@ -6,20 +6,20 @@
  * verdicts, kill switch history — is unverified from that point on.
  */
 
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { verifyChain } from '../../shared/auditChain.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Forbidden — chain verification is an operator function.' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
     const limit = typeof body?.limit === 'number' && body.limit > 0 && body.limit <= 2000 ? body.limit : 500;
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     const result = await verifyChain(svc, limit);
 
     // Recording the verification extends the chain, so a later reader can see that a

@@ -6,8 +6,7 @@ const BOTTOM = 780;
 
 /**
  * Render a signed self-test report to a PDF.
- * The signature block is printed in full so the file can be re-verified later —
- * a report that certifies itself without showing what was signed is decoration.
+ * The signature block is printed in full so the file can be re-verified later.
  */
 export function buildSelfTestPdf(report) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
@@ -56,6 +55,10 @@ export function buildSelfTestPdf(report) {
   text(`Model requested for all judging calls: ${report.testerModelRequested}`, { size: 10, style: 'bold' });
   text(
     'This states the model id this harness asked for. It is not independent proof of which weights the provider ran. The signature below protects this report from being edited after the fact — that is all it claims.',
+    { size: 9, color: [110, 118, 129] },
+  );
+  text(
+    'This maintainer-generated report is not an independent evaluation or certification. Model-backed judgments are probabilistic and may vary between runs.',
     { size: 9, color: [110, 118, 129] },
   );
 
@@ -116,7 +119,7 @@ export function buildSelfTestPdf(report) {
     y += 4;
   }
   text(
-    'Signing proves this report came from this harness. It says nothing about whether the content it certifies is correct.',
+    'A valid signature can verify report integrity and origin. It says nothing about whether the content is correct or independently assessed.',
     { size: 8.5, color: [110, 118, 129] },
   );
 

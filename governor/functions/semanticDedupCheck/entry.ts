@@ -1,9 +1,9 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — semantic checks spend model credits.' }, { status: 403 });
 
@@ -33,7 +33,7 @@ Respond as JSON: {"isDuplicate": boolean, "matchedAction": string or null, "reas
 - isDuplicate=true ONLY if the current action is clearly the same intent as a recent one.
 - Be conservative: similar but distinct actions should return false.`;
 
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const result = await appClient.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
       model: selectedModel,
       response_json_schema: {

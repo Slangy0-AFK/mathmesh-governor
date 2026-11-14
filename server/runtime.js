@@ -15,7 +15,7 @@ const entities = new Proxy({}, {
   get: (_target, name) => typeof name === 'string' ? entityStore(name) : undefined,
 });
 
-export function createClientFromRequest(request) {
+export function createAppClientFromRequest(request) {
   const serviceRole = { entities, integrations: { Core: { InvokeLLM: invokeModel } } };
   return {
     auth: { me: () => authenticateRequest(request) },

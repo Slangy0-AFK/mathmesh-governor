@@ -15,8 +15,8 @@ that is not yours while validating a report.
 
 ## Secret Handling
 
-- Keep Base44, provider, Sentry, Prometheus, and test credentials in the
-  platform's secret store or the appropriate GitHub Environment.
+- Keep provider, Sentry, Prometheus, and test credentials in the server's secret
+  store or the appropriate GitHub Environment.
 - Never commit `.env` files, live test credentials, agent keys, or raw prompts
   and outputs from real users.
 - Treat `VITE_*` values as public browser configuration. The Sentry browser DSN
@@ -27,6 +27,5 @@ that is not yours while validating a report.
 ## Supported Scope
 
 Security reports are welcome for the application and workflows in this
-repository. Base44 platform vulnerabilities should be reported to Base44 through
-its security reporting channel. This application is not a sandbox and cannot
-control agent activity outside requests routed through it.
+repository. This application is not a sandbox and cannot control agent activity
+outside requests routed through it.

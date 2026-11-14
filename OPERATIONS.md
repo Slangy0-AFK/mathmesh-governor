@@ -163,10 +163,9 @@ store; rotate it if it is lost or may have been exposed.
 
 The live E2E suite mutates test data and briefly toggles the global emergency
 stop. It requires explicit `E2E_RUN_LIVE=true` and `E2E_ALLOW_MUTATIONS=true`,
-credentials, and an HTTPS `E2E_BASE_URL`. Build that dedicated test deployment
-with `npm run build -- --mode e2e` to expose the local API test hook. Standard
-builds never include the hook. Review the report and confirm probe cleanup
-after each run.
+credentials, and an HTTPS `E2E_BASE_URL`. It exercises the authenticated API
+directly and requires no browser-injected test hook or special build mode.
+Review the report and confirm probe cleanup after each run.
 
 Before accepting traffic or a lab run, verify the key requirement, per-agent
 permissions, request and estimated-token limits, global stop, egress behavior,

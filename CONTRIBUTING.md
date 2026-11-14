@@ -2,7 +2,7 @@
 
 ## Local Setup
 
-Use Node.js 20 or newer and npm:
+Use Node.js 22 or newer and npm:
 
 ```bash
 npm ci
@@ -24,8 +24,8 @@ scanning, and dependency review. Bandit runs when Python source files are added.
 ## Changes and Pull Requests
 
 - Keep changes focused and include tests for behavior changes.
-- Describe user impact, security implications, and any required Base44 secret or
-  entity configuration.
+- Describe user impact, security implications, and any required environment or
+  database configuration.
 - Never include credentials, real user data, prompts, or model outputs in tests,
   fixtures, logs, or screenshots.
 - Do not run the live enforcement suite against production. It mutates test data
@@ -39,7 +39,7 @@ scanning, and dependency review. Bandit runs when Python source files are added.
 ## Environments
 
 Configure distinct GitHub Environments named `development`, `staging`, and
-`production`, with separate Base44 app IDs and credentials. Require reviewers
-and restrict deployment branches for production. The repository currently uses
-`staging` for live enforcement and manual load tests; it does not yet automate
-Base44 deployments.
+`production`, with separate deployment and database credentials. Require
+reviewers and restrict deployment branches for production. The repository
+currently uses `staging` for live enforcement and manual load tests; it does not
+automate deployments.

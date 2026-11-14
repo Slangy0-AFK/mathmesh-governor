@@ -3,10 +3,19 @@ import { check, sleep } from 'k6';
 
 const targetUrl = __ENV.TARGET_URL;
 if (!targetUrl) {
-  throw new Error('Set TARGET_URL to a non-production staging HTTP endpoint.');
+  throw new Error('Set TARGET_URL to a non-production HTTPS staging endpoint.');
 }
-if (new URL(targetUrl).hostname === 'lean-math-mesh.base44.app') {
-  throw new Error('Load testing the published production app is blocked.');
+if (__ENV.TARGET_ENV !== 'staging') {
+  throw new Error('Set TARGET_ENV=staging; production load testing is not permitted.');
+}
+let target;
+try {
+  target = new URL(targetUrl);
+} catch {
+  throw new Error('TARGET_URL must be an absolute HTTPS staging URL.');
+}
+if (target.protocol !== 'https:') {
+  throw new Error('TARGET_URL must be an absolute HTTPS staging URL.');
 }
 
 export const options = {

@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import {
   DRIFT_EVAL_SET,
   DRIFT_HELDOUT_SET,
@@ -21,8 +21,8 @@ function pickSet(name: string): { cases: typeof DRIFT_EVAL_SET; stats: typeof EV
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     // Evaluation runs the judge once per labeled case per repeat, so it is admin-gated.
     if (user.role !== 'admin') {
@@ -56,7 +56,7 @@ export default async function(req: Request): Promise<Response> {
         const res = await detectSemanticDrift(
           c.response,
           c.decoyIds,
-          (args) => base44.asServiceRole.integrations.Core.InvokeLLM(args as any),
+          (args) => appClient.asServiceRole.integrations.Core.InvokeLLM(args as any),
           { threshold: headlineThreshold, model, task: c.task },
         );
         scores.push(res.detectorError ? null : res.maxScore);
@@ -128,7 +128,7 @@ export default async function(req: Request): Promise<Response> {
         : 'TUNING set: the threshold was chosen on these cases, so TPR/FPR here are optimistically overfit. Run the held-out set for a less-biased number. ') +
       `LLM-as-judge (no embedding endpoint on this platform), non-deterministic, model="${model}". Valid for comparing thresholds and catching a broken detector; NOT a general benchmark.`;
 
-    const record = await base44.asServiceRole.entities.DriftEvalResult.create({
+    const record = await appClient.asServiceRole.entities.DriftEvalResult.create({
       detector: 'semantic',
       model,
       threshold: headlineThreshold,

@@ -13,7 +13,7 @@
  *     that turns its own failures into green checks is worse than no suite.
  */
 
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { judgeOutput } from '../../shared/outputJudge.ts';
 import { signMessage } from '../../shared/signing.ts';
 import { sha256Hex } from '../../shared/agentKeys.ts';
@@ -29,14 +29,14 @@ This summary does not analyse the causes of any variance.`;
 
 export default async function (req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') {
       return Response.json({ error: 'Admin only — the self-test spends model credits.' }, { status: 403 });
     }
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     const invoke = (args: any) => svc.integrations.Core.InvokeLLM(args);
     const startedAt = new Date().toISOString();
     const cases: any[] = [];
@@ -142,7 +142,7 @@ export default async function (req: Request): Promise<Response> {
     // --- Case 6: the audit chain must verify. -------------------------------------
     let chain: any = null;
     try {
-      const res = await base44.functions.invoke('verifyAuditChain', { limit: 200 });
+      const res = await appClient.functions.invoke('verifyAuditChain', { limit: 200 });
       chain = res.data;
       record(
         'audit_chain', 'The audit chain verifies',
@@ -201,7 +201,7 @@ export default async function (req: Request): Promise<Response> {
       'A leaked agent key IS the agent. Keys can be rotated, not recovered, and nothing here detects a key used correctly by the wrong party.',
       'The egress allowlist only governs calls proxied through this app. It is a policy surface, not network containment.',
       'This report attests to the model id this harness REQUESTED for its judging calls. It is not proof of which weights the provider actually ran; the signature protects the report from edits, and nothing more.',
-      'Signing proves a record came from this harness. It says nothing about whether the content it certifies is correct.',
+      'A valid signature can verify a record\'s origin and integrity. It says nothing about whether the content is correct.',
     ];
 
     const finishedAt = new Date().toISOString();

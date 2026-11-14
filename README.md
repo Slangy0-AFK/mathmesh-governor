@@ -1,9 +1,17 @@
 ## Self-Hosted Application
 
-MathMesh Governor runs as a standalone Node.js API with PostgreSQL storage and
-a Vite/React dashboard. It does not require the Base44 SDK, hosted functions,
-hosted entities, or platform authentication. It is not independently assessed
-or certified; configure and operate it as security-sensitive software.
+MathMesh Governor is a self-hosted Node.js API with PostgreSQL storage and a
+Vite/React dashboard. Model-provider requests are made server-side using the
+configured provider credentials.
+
+## Assessment and evidence status
+
+This project has not been independently assessed or certified. Its tests are
+maintainer-authored checks of specific code paths; they do not establish
+security, safety, compliance, or general model capability. Treat test and
+evaluation reports as preliminary evidence for the exact revision, environment,
+and data recorded with each run, not as certification or independent
+validation.
 
 The operator dashboard uses a server-configured admin account. Governance
 handlers remain server-side, and model credentials are read only from the
@@ -21,16 +29,17 @@ token-budget capacity, and records the decision before allowing the call.
 
 This enforcement path is separate from the model-assisted quality checks.
 Those checks use LLMs for semantic deduplication and drift/grounding assessment;
-they are probabilistic and can vary between runs. With the LLM-backed stages
-enabled, dedup makes its own model call and drift/grounding share a judge call;
-a full run can make two to three model calls, charged to the agent's token
-budget. The admission policy checks are deterministic rules; the overall
-quality path is not deterministic.
+they are probabilistic and can vary between runs, providers, and model versions.
+With the LLM-backed stages enabled, dedup makes its own model call and
+drift/grounding share a judge call; a full run can make two to three model
+calls, charged to the agent's token budget. The admission policy checks are
+deterministic rules; the overall quality path is not deterministic.
 
-Some checks run in the browser, and usage limits are estimates rather than the
-provider's final bill. The app does not isolate an agent or control activity
-outside this app. Test results are preliminary; they are not independent
-validation or a safety certification.
+Browser checks cover the interface; admission and model-provider calls are
+server-side. Usage limits are estimates rather than the provider's final bill.
+The app does not isolate an agent or control activity outside this app. A
+passing test run is limited to the cases and environment exercised; it is not
+independent validation or a safety certification.
 
 For test instructions and known evidence limits, see [LAB_EVALUATION.md](LAB_EVALUATION.md).
 For deployment and operator checks, see [OPERATIONS.md](OPERATIONS.md).
@@ -62,7 +71,7 @@ Running this in production means more than the controls themselves: data
 retention, who can access stored prompts and outputs, key rotation, deployment
 requirements, and monitoring for failures. See [OPERATIONS.md](./OPERATIONS.md).
 
-## Test a model directly from GitHub (no site or Base44 account)
+## Run a model benchmark
 
 Clone this public repository, install dependencies, and run the same ten-case reference benchmark used by the app. Testers use their own provider account and key; the key is sent directly from their machine to that provider and is not saved by this project.
 
@@ -81,20 +90,38 @@ The command prints pass/fail/error results and writes full prompts, reference an
 
 This is a small author-written public structured-output smoke test (ten cases), not an independent or held-out evaluation and not a certification of general intelligence, safety, identity, permissions, budgets, or the full MathMesh harness. Provider charges and data policies apply. Never commit API keys or the generated results file if its outputs are sensitive.
 
+## Test reliability
+
+Unit tests for policy, accounting, scoring, and input validation are deterministic
+and run without model-provider access. Browser smoke tests check page loading and
+routing; they do not establish that live backend controls work. The live
+enforcement suite calls the authenticated HTTP API directly, avoiding
+browser-side setup for control assertions.
+
+The semantic drift evaluation, grounding judgments, signed self-test, and
+provider benchmark make LLM calls. Their verdicts can vary between repeated
+runs and can fail because of provider availability, model changes, or response
+format differences. These are exploratory checks, not stable pass/fail release
+gates. Repeat them, retain each run's revision/provider/model/configuration and
+pass/fail/error counts, and report errors separately from failures and passes.
+Do not treat retries or a single passing run as independent validation.
+
 ## Backend enforcement tests
 
-The enforcement suite contains 11 backend checks and two UI checks. It covers
+The live enforcement suite contains 13 API checks. It covers
 unknown and incorrectly keyed agents, frozen and revoked agents, action
 permissions, request limits, estimated-token exhaustion, the global emergency
 stop, denied-request spend, audit-verification response shape, egress policy,
-human review, and the signed self-test. Browser smoke tests separately check
-that pages load; they do not verify live backend controls.
+human review, server-side admission in the model-spend path, and the signed
+self-test report shape. The signed self-test makes model calls; the test checks
+report structure and signature fields, not that every probabilistic judge
+verdict passes. Browser smoke tests separately check that pages load; they do
+not verify live backend controls.
 
 These tests create and delete probe data, add a temporary spend record, and
 momentarily change the global emergency stop. Run them only against a dedicated
-HTTPS test deployment with synthetic data and a dedicated administrator. Build
-that deployment in Vite mode `e2e` to expose the local API test hook; normal
-builds never expose it.
+HTTPS test deployment with synthetic data and a dedicated administrator. The
+checks use authenticated HTTP requests and need no special build mode.
 
 ```bash
 export E2E_RUN_LIVE=true
@@ -102,7 +129,6 @@ export E2E_ALLOW_MUTATIONS=true
 export E2E_BASE_URL="https://your-dedicated-test-deployment.example"
 export E2E_AUTH_EMAIL="your-test-admin@example.com"
 export E2E_AUTH_PASSWORD="your-test-password"
-npm run build -- --mode e2e
 npm run test:e2e:enforcement
 ```
 

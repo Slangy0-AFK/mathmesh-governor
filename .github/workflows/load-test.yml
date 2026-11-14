@@ -13,4 +13,5 @@ jobs:
         env:
           TARGET_URL: ${{ secrets.LOAD_TEST_TARGET_URL }}
           AUTH_TOKEN: ${{ secrets.PROMETHEUS_SCRAPE_TOKEN }}
+          TARGET_ENV: staging
         run: k6 run tests/load/health-smoke.js

@@ -9,7 +9,7 @@
  *                agent's loyalty, so it does NOT trip the kill switch.
  */
 
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { judgeOutput } from '../../shared/outputJudge.ts';
 import { generateNonce, DRIFT_THRESHOLD } from '../../shared/semanticDrift.ts';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
@@ -19,8 +19,8 @@ import { chargeOverhead } from '../../shared/tokenLedger.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — the output judge spends model credits.' }, { status: 403 });
 
@@ -31,7 +31,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'Missing response text' }, { status: 400 });
     }
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     const ids: string[] = Array.isArray(decoyIds) ? decoyIds : [];
     const agent = agentId || 'unknown';
     const policy = await loadPolicy(svc);

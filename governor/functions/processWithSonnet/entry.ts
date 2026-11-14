@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { selectDecoys } from '../../shared/decoys.ts';
 import { admitRequest, consumeTicket } from '../../shared/admission.ts';
 import { signOutput } from '../../shared/signing.ts';
@@ -11,8 +11,8 @@ import { reportFunctionError } from '../../shared/observability.ts';
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — model processing uses the app account.' }, { status: 403 });
 
@@ -35,7 +35,7 @@ export default async function(req: Request): Promise<Response> {
     // this function runs admission itself. There is no third option, so calling this
     // endpoint directly no longer skips identity, the kill switch, the tool gate, the
     // rate limit or the loop breaker.
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     let admissionSource = 'ticket';
     if (admissionTicket) {
       const spent = await consumeTicket(svc, {

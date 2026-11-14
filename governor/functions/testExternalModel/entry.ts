@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { CASES, VERSION, scoreAnswer, buildReport } from '../../shared/modelBenchmark.js';
 import { prepareConnection, callConnectedModel } from '../../shared/modelConnection.ts';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
@@ -6,8 +6,8 @@ import { reserveTokens } from '../../shared/tokenLedger.ts';
 
 export default async function(req) {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Only an administrator can run model benchmarks or submit results.' }, { status: 403 });
     const raw = await req.text();
@@ -26,7 +26,7 @@ export default async function(req) {
       return Response.json(buildReport(body.model.trim(), 'submitted — unverified origin', cases));
     }
     if (body.mode !== 'live') return Response.json({ error: 'Use manifest, live or submitted mode.' }, { status: 400 });
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     let connection;
     try { connection = await prepareConnection(svc, body); } catch (error) { return Response.json({ error: error.message }, { status: 400 }); }
     const policy = await loadPolicy(svc);

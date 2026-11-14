@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { generateAgentKey, sha256Hex } from '../../shared/agentKeys.ts';
 
 /**
@@ -10,8 +10,8 @@ import { generateAgentKey, sha256Hex } from '../../shared/agentKeys.ts';
  */
 export default async function (req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') {
       return Response.json({ error: 'Forbidden — only an app admin may issue agent keys.' }, { status: 403 });
@@ -21,7 +21,7 @@ export default async function (req: Request): Promise<Response> {
     const agentId = typeof body.agentId === 'string' ? body.agentId.trim() : '';
     if (!agentId) return Response.json({ error: 'agentId is required' }, { status: 400 });
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     const rows = await svc.entities.AgentIdentity.filter({ agent_id: agentId }, '-created_date', 1);
     if (rows.length === 0) {
       return Response.json({ error: `No registered agent "${agentId}". Register it first.` }, { status: 404 });

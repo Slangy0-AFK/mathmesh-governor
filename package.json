@@ -6,7 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "dev": "concurrently -k \"node --env-file-if-exists=.env --import tsx --watch server/index.js\" \"vite --host 0.0.0.0\"",
-    "dev:e2e": "vite --host 127.0.0.1 --mode e2e",
+    "dev:e2e": "vite --host 127.0.0.1",
     "start": "node --env-file-if-exists=.env --import tsx server/index.js",
     "build": "vite build",
     "lint": "eslint . --quiet",

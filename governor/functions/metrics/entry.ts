@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { reportFunctionError } from '../../shared/observability.ts';
 
 const SAMPLE_LIMIT = 1000;
@@ -15,8 +15,8 @@ export default async function (req: Request): Promise<Response> {
   }
 
   try {
-    const base44 = createClientFromRequest(req);
-    const runs = await base44.asServiceRole.entities.PipelineRun.list(
+    const appClient = createAppClientFromRequest(req);
+    const runs = await appClient.asServiceRole.entities.PipelineRun.list(
       '-created_date', SAMPLE_LIMIT, 0, ['status', 'tokens_spent', 'drift_detected'],
     );
     const passed = runs.filter((run) => run.status === 'PASSED').length;

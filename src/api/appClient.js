@@ -63,11 +63,3 @@ export const apiClient = {
     },
   },
 };
-
-if (typeof window !== 'undefined' && import.meta.env.MODE === 'e2e') {
-  window.__mathmesh = apiClient;
-}
-
-if (typeof window !== 'undefined' && import.meta.env.MODE === 'e2e') {
-  window.__mathmesh = apiClient;
-}

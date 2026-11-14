@@ -13,7 +13,7 @@
  * verdict.
  */
 
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { appendAudit } from '../../shared/auditChain.ts';
 
 const ALLOWED = new Set([
@@ -22,8 +22,8 @@ const ALLOWED = new Set([
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — audit records are restricted to app operators.' }, { status: 403 });
 
@@ -38,7 +38,7 @@ export default async function(req: Request): Promise<Response> {
       }, { status: 403 });
     }
 
-    const row = await appendAudit(base44.asServiceRole, {
+    const row = await appendAudit(appClient.asServiceRole, {
       event_type: eventType,
       agent_id: String(body?.agent_id || 'unknown'),
       session_nonce: String(body?.session_nonce || ''),

@@ -1,9 +1,9 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — retrieval uses the app model account.' }, { status: 403 });
 
@@ -16,7 +16,7 @@ export default async function(req: Request): Promise<Response> {
     }
 
     // Fetch all KB entries (service role — KB is shared app knowledge)
-    const allEntries = await base44.asServiceRole.entities.KnowledgeBase.list();
+    const allEntries = await appClient.asServiceRole.entities.KnowledgeBase.list();
 
     // Filter by action_scope: include '*' (all), empty, or matching action
     const scoped = allEntries.filter((e: any) =>
@@ -43,7 +43,7 @@ Which entries contain information directly relevant to answering this query? Ret
 
 Return JSON: {"relevant_indices": [0, 2, 5]}`;
 
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+    const result = await appClient.asServiceRole.integrations.Core.InvokeLLM({
       prompt,
       response_json_schema: {
         type: 'object',

@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { verifyOutputSignature } from '../../shared/signing.ts';
 
 /**
@@ -14,8 +14,8 @@ import { verifyOutputSignature } from '../../shared/signing.ts';
  */
 export default async function (req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — output attribution may reveal stored run metadata.' }, { status: 403 });
 
@@ -28,7 +28,7 @@ export default async function (req: Request): Promise<Response> {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
     const outputHash = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 
-    const runs = await base44.asServiceRole.entities.PipelineRun.filter({ output_hash: outputHash }, '-created_date', 10);
+    const runs = await appClient.asServiceRole.entities.PipelineRun.filter({ output_hash: outputHash }, '-created_date', 10);
 
     const results = [];
     for (const run of runs) {

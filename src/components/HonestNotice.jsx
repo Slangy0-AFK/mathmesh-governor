@@ -24,10 +24,16 @@ export default function HonestNotice() {
             tasks, or deployments. Independent testing is still needed.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
-            The pipeline also runs in the browser, so it governs cooperating agents; it is not a
-            security boundary against a hostile caller. Server-side access controls do not isolate
-            an agent or control activity that takes place outside this app. This is a testable
-            prototype, not a security certification or proof that an AI system is safe.
+            The dashboard runs in the browser, while admission and spend enforcement run on the
+            server. This is not a sandbox and cannot control activity outside requests routed
+            through this app. The project has not been independently assessed or certified; these
+            tests do not prove that an AI system is safe.
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Drift and grounding judgments, the signed self-test, and external model benchmarks use
+            language models. Their results are probabilistic and can vary by run, provider, or model
+            version. Treat them as preliminary evidence for the recorded setup, not as release
+            certification.
           </p>
           <p className="text-xs text-slate-600 leading-relaxed">
             Most importantly, this detects but does not contain. There is no sandbox, so a halt

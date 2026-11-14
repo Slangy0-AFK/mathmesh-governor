@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { admitRequest } from '../../shared/admission.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
 import { checkEgressPermission, parseEgressTarget } from '../../shared/egressPolicy.ts';
@@ -18,8 +18,8 @@ import { reportFunctionError } from '../../shared/observability.ts';
  */
 export default async function (req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — outbound requests use the app network path.' }, { status: 403 });
 
@@ -33,7 +33,7 @@ export default async function (req: Request): Promise<Response> {
       return Response.json({ error: 'agentId, action and url are required' }, { status: 400 });
     }
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
 
     const verdict = await admitRequest(svc, {
       agentId, action, sessionNonce: body.sessionNonce, agentKey: body.agentKey,

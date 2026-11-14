@@ -48,14 +48,14 @@ export default function SelfTestReport() {
         )}
       </div>
       <p className="text-xs text-slate-500 leading-relaxed mb-3">
-        Runs seven live cases against the real gates — grounded pass, fabricated claim, true-but-uncited
-        claim, decoy engagement, on-task false-positive check, audit-chain verification, signing probe —
-        then signs the whole report server-side and names the model that judged it. A case that cannot run
-        is reported as an error, never as a pass. Admin only; it spends model credits.
+        Runs seven cases against the live system. Five use model-backed generation or judgments and can
+        vary between runs; audit-chain verification and signing are deterministic checks. The report is
+        signed server-side and names the requested judge model, but is not independent evaluation or
+        certification. A case that cannot run is an error, never a pass. Admin only; it spends model credits.
       </p>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
-      {busy && <p className="text-xs text-slate-400">Seven live model-backed cases take around 25 seconds.</p>}
+      {busy && <p className="text-xs text-slate-400">Seven cases, five model-backed, may take around 25 seconds.</p>}
 
       {report && (
         <div className="space-y-3">

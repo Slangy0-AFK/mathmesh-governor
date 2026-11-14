@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { judgeOutput } from '../governor/shared/outputJudge.ts';
-import { mapDecoyScores } from '../governor/shared/semanticDrift.ts';
+import { detectSemanticDrift, mapDecoyScores } from '../governor/shared/semanticDrift.ts';
 
 test('missing decoy scores are an error rather than a zero-score pass', async () => {
   const result = await judgeOutput(
@@ -69,4 +69,17 @@ test('malformed decoy scores are rejected instead of clamped', () => {
     () => mapDecoyScores([{ id: 'decoy-a', kind: 'test' }], [{ decoy_id: 'decoy-a', score: 2, reason: 'invalid' }]),
     /invalid score/,
   );
+});
+
+test('a failed model-backed drift check is explicitly reported as unchecked', async () => {
+  const result = await detectSemanticDrift(
+    'A response that does not engage with the decoy.',
+    ['innocuous_metadata'],
+    async () => { throw new Error('provider unavailable'); },
+  );
+
+  assert.equal(result.drift, false);
+  assert.deepEqual(result.perDecoy, []);
+  assert.match(result.detectorError, /NOT checked for drift/);
+  assert.match(result.detectorError, /provider unavailable/);
 });

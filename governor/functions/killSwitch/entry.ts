@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { loadPolicy } from '../../shared/harnessPolicy.ts';
 import { generateNonce } from '../../shared/semanticDrift.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
@@ -14,8 +14,8 @@ import { appendAudit } from '../../shared/auditChain.ts';
  */
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') {
       return Response.json({ error: 'Forbidden — the kill switch is admin only.' }, { status: 403 });
@@ -26,7 +26,7 @@ export default async function(req: Request): Promise<Response> {
     const reason = typeof body.reason === 'string' ? body.reason : '';
     const agentId = typeof body.agentId === 'string' ? body.agentId.trim() : '';
 
-    const svc = base44.asServiceRole;
+    const svc = appClient.asServiceRole;
     const policy = await loadPolicy(svc);
     const nonce = generateNonce();
 

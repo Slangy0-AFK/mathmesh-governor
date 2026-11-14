@@ -33,8 +33,8 @@ const PUBLIC_CASES = {
     means: 'The tamper-evidence check over the recorded history found no altered, missing or forged entries.',
   },
   signing_live: {
-    name: 'Certification is active',
-    means: 'Records are certified with a key held only on the server, so a record can be shown to have come from this system.',
+    name: 'Report signing is active',
+    means: 'The server signs the report, allowing its integrity to be checked with the server-held key. This does not independently assess the report.',
   },
 };
 
@@ -68,10 +68,10 @@ export function buildPublicBriefPdf(report) {
 
   // --- Cover ---------------------------------------------------------------
   text('Agent Governance Brief', { size: 18, style: 'bold', color: [15, 23, 42], gap: 2 });
-  text('Independent-reader summary — outcomes only, mechanics withheld', { size: 10, color: [110, 118, 129], gap: 8 });
+  text('External-reader summary — outcomes only, mechanics withheld', { size: 10, color: [110, 118, 129], gap: 8 });
   text(`Test run ${report.finishedAt} · ${report.summary.passed} of ${report.summary.total} checks passed`, { size: 10, style: 'bold', gap: 4 });
   text(
-    'This brief reports what the system was observed to do. It deliberately omits how the checks are constructed — thresholds, detection patterns and internal wording are all left out, because publishing them is publishing the way around them. The signed technical report holds those details for anyone entitled to audit them.',
+    'This maintainer-generated report is preliminary evidence from one run, not an independent assessment or certification. Five cases use model-backed judgments that can vary between runs. It reports what the system was observed to do in this run and deliberately omits implementation details; the signed technical report holds those details for authorized review.',
     { size: 9, color: [110, 118, 129], gap: 8 },
   );
   rule();
@@ -95,7 +95,7 @@ export function buildPublicBriefPdf(report) {
   heading('What was observed');
   for (const c of report.cases || []) {
     const pub = PUBLIC_CASES[c.id] || { name: c.name, means: '' };
-    const mark = c.passed === true ? 'CONFIRMED' : c.passed === false ? 'NOT CONFIRMED' : 'COULD NOT RUN';
+    const mark = c.passed === true ? 'PASS IN THIS RUN' : c.passed === false ? 'FAIL IN THIS RUN' : 'COULD NOT RUN';
     const color = c.passed === true ? [5, 122, 85] : c.passed === false ? [190, 30, 45] : [180, 120, 10];
     text(`${mark} — ${pub.name}`, { size: 10.5, style: 'bold', color, gap: 2 });
     if (pub.means) text(pub.means, { size: 9, color: [70, 78, 90], indent: 14, gap: 8 });
@@ -112,7 +112,7 @@ export function buildPublicBriefPdf(report) {
     'An agent that abandons its task to follow instructions planted in its input is detected and restricted automatically, with the restriction escalating on repetition and reversible only by a named operator.',
     'Every permission decision happens before spend and on the server, so a modified or malicious client cannot skip it.',
     'An agent must prove who it is with a secret, and an unrecognised identity is refused rather than quietly created — so an agent cannot escape a restriction by renaming itself.',
-    'Every released answer is certified to the agent, session and task that produced it, so an output can be traced back to its origin rather than merely recognised.',
+    'Every released answer is signed against the agent, session, task and output hash, allowing its origin and integrity to be checked. A valid signature does not establish that the answer is correct.',
     'The activity record is tamper-evident: an altered, deleted or forged entry shows up whenever the check is run, and anyone can run it.',
     'Outbound calls made through the system are denied by default and permitted only to named destinations, with every attempt logged against the agent that tried it.',
     'Detection accuracy is measured on labelled examples and both its hit rate and its false-alarm rate are published, rather than asserted.',
@@ -182,17 +182,17 @@ export function buildPublicBriefPdf(report) {
     { size: 10, gap: 8 },
   );
 
-  // --- Certification -------------------------------------------------------
+  // --- Integrity signature -------------------------------------------------
   rule();
-  text('Certification', { size: 10, style: 'bold', color: [15, 23, 42], gap: 3 });
+  text('Integrity signature', { size: 10, style: 'bold', color: [15, 23, 42], gap: 3 });
   text(
-    'The underlying technical report is certified with a key held only on this system\'s server, so the results above cannot be edited after the fact without the certification failing. Certification proves origin. It says nothing about whether the content is correct.',
+    'The underlying technical report is signed with a key held only on this system\'s server. The signature can detect edits to the signed report; it does not establish correctness, independent assessment, or certification.',
     { size: 9, color: [110, 118, 129], gap: 4 },
   );
   doc.setFont('courier', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(90, 98, 110);
-  for (const line of doc.splitTextToSize(`certificate reference: ${String(report.signature).slice(0, 32)}…`, WIDTH - MARGIN * 2)) {
+  for (const line of doc.splitTextToSize(`signature reference: ${String(report.signature).slice(0, 32)}…`, WIDTH - MARGIN * 2)) {
     if (y > BOTTOM) page();
     doc.text(line, MARGIN, y);
     y += 11;

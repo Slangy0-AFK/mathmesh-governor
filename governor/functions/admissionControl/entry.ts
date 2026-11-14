@@ -1,4 +1,4 @@
-import { createClientFromRequest } from '../../../server/runtime.js';
+import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { admitRequest } from '../../shared/admission.ts';
 
 /**
@@ -10,8 +10,8 @@ import { admitRequest } from '../../shared/admission.ts';
  */
 export default async function(req: Request): Promise<Response> {
   try {
-    const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
+    const appClient = createAppClientFromRequest(req);
+    const user = await appClient.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     if (user.role !== 'admin') return Response.json({ error: 'Admin only — admission changes agent counters and issues tickets.' }, { status: 403 });
 
@@ -23,7 +23,7 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ error: 'agentId and action are required' }, { status: 400 });
     }
 
-    const verdict = await admitRequest(base44.asServiceRole, {
+    const verdict = await admitRequest(appClient.asServiceRole, {
       agentId, action,
       sessionNonce: typeof body.sessionNonce === 'string' ? body.sessionNonce : '',
       agentKey: typeof body.agentKey === 'string' ? body.agentKey : '',
