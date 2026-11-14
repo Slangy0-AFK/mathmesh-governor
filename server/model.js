@@ -3,6 +3,28 @@ const PROVIDERS = {
   openai: { endpoint: 'https://api.openai.com/v1/chat/completions' },
 };
 
+/**
+ * Extract usage data from provider response. Returns {input, output, total} if available,
+ * or null if provider did not report usage.
+ */
+function extractUsage(data, provider) {
+  if (provider === 'anthropic') {
+    const usage = data.usage || {};
+    const input = usage.input_tokens ?? null;
+    const output = usage.output_tokens ?? null;
+    const total = (Number.isFinite(input) && Number.isFinite(output)) ? input + output : null;
+    return { input, output, total };
+  }
+  if (provider === 'openai' || provider === 'compatible') {
+    const usage = data.usage || {};
+    const input = usage.prompt_tokens ?? null;
+    const output = usage.completion_tokens ?? null;
+    const total = usage.total_tokens ?? null;
+    return { input, output, total };
+  }
+  return { input: null, output: null, total: null };
+}
+
 export async function invokeModel({ prompt, response_json_schema, model }) {
   const provider = process.env.MODEL_PROVIDER || 'anthropic';
   const apiKey = process.env.MODEL_API_KEY;
@@ -52,19 +74,25 @@ export async function invokeModel({ prompt, response_json_schema, model }) {
     throw new Error(`Configured model provider returned HTTP ${response.status}.`);
   }
   const data = await response.json();
+  const usage = extractUsage(data, provider);
+
   if (provider === 'anthropic') {
     const tool = data.content?.find((item) => item.type === 'tool_use' && item.name === 'structured_verdict');
     if (response_json_schema) {
       if (!tool?.input || typeof tool.input !== 'object') throw new Error('Model provider returned no structured verdict.');
-      return tool.input;
+      return { response: tool.input, usage };
     }
     const text = data.content?.filter((item) => item.type === 'text').map((item) => item.text).join('');
     if (typeof text !== 'string' || !text.trim()) throw new Error('Model provider returned no text.');
-    return text;
+    return { response: text, usage };
   }
 
   const text = data.choices?.[0]?.message?.content;
   if (typeof text !== 'string' || !text.trim()) throw new Error('Model provider returned no text.');
-  if (!response_json_schema) return text;
-  try { return JSON.parse(text); } catch { throw new Error('Model provider returned invalid structured JSON.'); }
+  if (!response_json_schema) return { response: text, usage };
+  try { 
+    return { response: JSON.parse(text), usage }; 
+  } catch { 
+    throw new Error('Model provider returned invalid structured JSON.'); 
+  }
 }

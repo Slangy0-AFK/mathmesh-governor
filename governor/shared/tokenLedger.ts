@@ -105,18 +105,38 @@ export async function reserveTokens(
 export async function reconcileTokens(
   svc: any,
   reservationId: string | undefined,
-  actual: { promptText: string; responseText: string; note?: string },
-): Promise<{ tokens: number }> {
-  const inTokens = estimateTokens(actual.promptText);
-  const outTokens = estimateTokens(actual.responseText);
-  const total = inTokens + outTokens;
+  actual: { promptText: string; responseText: string; note?: string; providerUsage?: { input?: number | null; output?: number | null; total?: number | null } },
+): Promise<{ tokens: number; usageSource: 'provider' | 'estimate' }> {
+  let inTokens: number | null = null;
+  let outTokens: number | null = null;
+  let total: number;
+  let usageSource: 'provider' | 'estimate' = 'estimate';
+  let usageNote = '';
+
+  // Prefer provider-reported usage when available.
+  if (actual.providerUsage && actual.providerUsage.input !== null && actual.providerUsage.input !== undefined && 
+      actual.providerUsage.output !== null && actual.providerUsage.output !== undefined) {
+    inTokens = actual.providerUsage.input ?? 0;
+    outTokens = actual.providerUsage.output ?? 0;
+    total = actual.providerUsage.total ?? (inTokens + outTokens);
+    usageSource = 'provider';
+    usageNote = `Reconciled to provider-reported usage: ${inTokens} input + ${outTokens} output = ${total} total tokens.`;
+  } else {
+    // Fall back to estimation if provider usage is unavailable.
+    inTokens = estimateTokens(actual.promptText);
+    outTokens = estimateTokens(actual.responseText);
+    total = inTokens + outTokens;
+    usageNote = `Reconciled to estimated sizes (chars/4) after the call. Provider usage was unavailable.`;
+  }
+
   if (reservationId) {
     await svc.entities.TokenSpend.update(reservationId, {
       phase: 'actual', tokens_in: inTokens, tokens_out: outTokens, tokens_total: total,
-      note: actual.note || 'Reconciled to the real prompt and response sizes after the call.',
+      estimated: usageSource === 'estimate', usage_source: usageSource,
+      note: actual.note || usageNote,
     });
   }
-  return { tokens: total };
+  return { tokens: total, usageSource };
 }
 
 /** Release a reservation whose call never happened. */

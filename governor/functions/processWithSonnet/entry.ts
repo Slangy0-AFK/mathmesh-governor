@@ -118,9 +118,10 @@ ${optimizedPayload}${contextBlock}`;
     }
 
     const responseText = typeof result === 'string' ? result : (result as any)?.response || JSON.stringify(result);
+    const providerUsage = (result as any)?.__usage__ || { input: null, output: null, total: null };
 
     const reconciled = await reconcileTokens(svc, budget.reservationId, {
-      promptText: prompt, responseText,
+      promptText: prompt, responseText, providerUsage,
     });
 
     // Sign the output where it is produced. Signing on the server, at the point of
@@ -133,7 +134,7 @@ ${optimizedPayload}${contextBlock}`;
       event_type: 'OUTPUT_SIGNED', agent_id: agentId, gate: 'Signing',
       session_nonce: sessionNonce, action, output_hash: outputHash,
       output_signature: outputSignature, tokens_total: reconciled.tokens,
-      details: `Output signed (HMAC-SHA256) and bound to ${agentId} / session ${sessionNonce.slice(0, 12)} / action ${action}. Estimated spend ~${reconciled.tokens} tokens.`,
+      details: `Output signed (HMAC-SHA256) and bound to ${agentId} / session ${sessionNonce.slice(0, 12)} / action ${action}. Spend ~${reconciled.tokens} tokens (${reconciled.usageSource}-reported).`,
       enforcement: 'none', server_enforced: true,
     });
 
@@ -156,7 +157,8 @@ ${optimizedPayload}${contextBlock}`;
         requested: budget.requested, spentBefore: budget.spent,
         limit: budget.limit, windowSeconds: budget.windowSeconds,
         remaining: Math.max(0, budget.limit - budget.spent - reconciled.tokens),
-        estimated: true,
+        estimated: reconciled.usageSource === 'estimate',
+        usageSource: reconciled.usageSource,
       },
       decoyIds: decoys.decoyIds,
       decoyPlacement: decoys.placement,

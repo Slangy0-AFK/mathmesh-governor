@@ -60,6 +60,8 @@ async function chainHead(svc: any): Promise<{ seq: number; hash: string }> {
   return { seq: head.seq, hash: head.row_hash };
 }
 
+export { chainHead };
+
 /**
  * Append an event to the chain. Every audit write in the harness must go through here
  * — a row written directly to the table has no hash and the verifier flags it.
