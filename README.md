@@ -256,9 +256,9 @@ server-side, audited, and fail closed if the enforcement path is unreachable.
 | Admission control | Server-side | Called inside the spend path, not beside it |
 | Agent identity | Server-side | 256-bit key; only SHA-256 hash stored; unknown IDs refused, not auto-registered |
 | Kill switch | Server-side | Global stop + per-agent freeze/revoke; checked at admission |
-| Token budget | Server-side | Reserved before `InvokeLLM`; denial returns 429 |
+| Token budget | Server-side | Reservations are serialized per agent in PostgreSQL before `InvokeLLM`; denial returns 429 |
 | Rate limit | Server-side | Per-identity window; ordered at reservation, not read-then-write |
-| Egress allowlist | Server-side, proxy-scoped | Denies by default; only covers traffic through the proxy |
+| Egress allowlist | Server-side, proxy-scoped | Requires public DNS answers and pins connections to a checked address; only covers traffic through the proxy |
 | Output signature | Server-side | HMAC-SHA256 under a secret the client never sees |
 | Audit chain | Server-side | Sequence + prev-hash + row-hash + HMAC; tamper-evident |
 

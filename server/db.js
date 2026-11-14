@@ -74,6 +74,45 @@ function decodeRow(row) {
   return row ? { ...row.data, id: row.id, created_date: row.created_at.toISOString(), updated_date: row.updated_at.toISOString() } : null;
 }
 
+async function tokenWindowSpend(client, agentId, windowSeconds) {
+  const result = await client.query(`
+    SELECT COALESCE(SUM((data->>'tokens_total')::numeric), 0) AS spent
+    FROM app_records
+    WHERE entity = 'TokenSpend' AND data->>'agent_id' = $1
+      AND data->>'phase' IS DISTINCT FROM 'refunded'
+      AND created_at >= clock_timestamp() - ($2 * interval '1 second')
+  `, [agentId, windowSeconds]);
+  return Number(result.rows[0].spent);
+}
+
+export const tokenLedger = {
+  windowSpend: (agentId, windowSeconds) => tokenWindowSpend(pool, agentId, windowSeconds),
+  async withReservationLock(agentId, callback) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('token-budget:' || $1, 0))", [agentId]);
+      const result = await callback({
+        windowSpend: (windowSeconds) => tokenWindowSpend(client, agentId, windowSeconds),
+        async create(data) {
+          const inserted = await client.query(
+            "INSERT INTO app_records (entity, data, created_at, updated_at) VALUES ('TokenSpend', $1::jsonb, clock_timestamp(), clock_timestamp()) RETURNING id, created_at, updated_at, data",
+            [JSON.stringify(data)],
+          );
+          return decodeRow(inserted.rows[0]);
+        },
+      });
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+};
+
 export function entityStore(entity) {
   assertEntity(entity);
   return {

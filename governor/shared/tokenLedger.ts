@@ -37,11 +37,7 @@ export interface BudgetVerdict {
 
 /** Estimated tokens already committed by this agent inside the token window. */
 export async function windowSpend(svc: any, agentId: string, windowSeconds: number): Promise<number> {
-  const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
-  const rows = await svc.entities.TokenSpend.filter({ agent_id: agentId }, '-created_date', 500);
-  return rows
-    .filter((r: any) => r.created_date >= windowStart && r.phase !== 'refunded')
-    .reduce((sum: number, r: any) => sum + (r.tokens_total || 0), 0);
+  return await svc.tokenLedger.windowSpend(agentId, windowSeconds);
 }
 
 /**
@@ -61,44 +57,49 @@ export async function reserveTokens(
   const requested = inTokens + outTokens;
 
   const limit = policy.max_tokens_per_window;
-  const spent = await windowSpend(svc, input.agentId, policy.token_window_seconds);
+  return await svc.tokenLedger.withReservationLock(input.agentId, async (ledger: {
+    windowSpend: (windowSeconds: number) => Promise<number>;
+    create: (data: Record<string, unknown>) => Promise<{ id: string }>;
+  }) => {
+    const spent = await ledger.windowSpend(policy.token_window_seconds);
 
-  const base: BudgetVerdict = {
-    allowed: true, reason: '', spent, limit, requested,
-    windowSeconds: policy.token_window_seconds,
-    remaining: Math.max(0, limit - spent),
-  };
-
-  if (requested > policy.max_tokens_per_request) {
-    const verdict = {
-      ...base, allowed: false,
-      reason: `Single request is ~${requested} estimated tokens, over the ${policy.max_tokens_per_request}-token per-request ceiling. One oversized payload must not be able to drain a window.`,
+    const base: BudgetVerdict = {
+      allowed: true, reason: '', spent, limit, requested,
+      windowSeconds: policy.token_window_seconds,
+      remaining: Math.max(0, limit - spent),
     };
-    if (!policy.enforce_token_budget) return { ...verdict, allowed: true, reason: `${verdict.reason} NOT ENFORCED — budget enforcement is off, so this was recorded and allowed.` };
-    return verdict;
-  }
 
-  if (spent + requested > limit) {
-    const verdict = {
-      ...base, allowed: false,
-      reason: `Token budget exhausted: ~${spent} of ${limit} estimated tokens already spent in the last ${policy.token_window_seconds}s, and this request needs ~${requested} more.`,
+    if (requested > policy.max_tokens_per_request) {
+      const verdict = {
+        ...base, allowed: false,
+        reason: `Single request is ~${requested} estimated tokens, over the ${policy.max_tokens_per_request}-token per-request ceiling. One oversized payload must not be able to drain a window.`,
+      };
+      if (!policy.enforce_token_budget) return { ...verdict, allowed: true, reason: `${verdict.reason} NOT ENFORCED — budget enforcement is off, so this was recorded and allowed.` };
+      return verdict;
+    }
+
+    if (spent + requested > limit) {
+      const verdict = {
+        ...base, allowed: false,
+        reason: `Token budget exhausted: ~${spent} of ${limit} estimated tokens already spent in the last ${policy.token_window_seconds}s, and this request needs ~${requested} more.`,
+      };
+      if (!policy.enforce_token_budget) return { ...verdict, allowed: true, reason: `${verdict.reason} NOT ENFORCED — budget enforcement is off.` };
+      return verdict;
+    }
+
+    const row = await ledger.create({
+      agent_id: input.agentId, action: input.action || '', session_nonce: input.sessionNonce || '',
+      phase: 'reserved', purpose: input.purpose || 'generation',
+      tokens_in: inTokens, tokens_out: outTokens, tokens_total: requested, estimated: true,
+      note: `Reserved before the call from a chars/4 estimate. Output assumed at ${outTokens} tokens.`,
+    });
+
+    return {
+      ...base, allowed: true, reservationId: row.id,
+      reason: `Reserved ~${requested} tokens. ~${spent + requested} of ${limit} used in this ${policy.token_window_seconds}s window.`,
+      remaining: Math.max(0, limit - spent - requested),
     };
-    if (!policy.enforce_token_budget) return { ...verdict, allowed: true, reason: `${verdict.reason} NOT ENFORCED — budget enforcement is off.` };
-    return verdict;
-  }
-
-  const row = await svc.entities.TokenSpend.create({
-    agent_id: input.agentId, action: input.action || '', session_nonce: input.sessionNonce || '',
-    phase: 'reserved', purpose: input.purpose || 'generation',
-    tokens_in: inTokens, tokens_out: outTokens, tokens_total: requested, estimated: true,
-    note: `Reserved before the call from a chars/4 estimate. Output assumed at ${outTokens} tokens.`,
   });
-
-  return {
-    ...base, allowed: true, reservationId: row?.id,
-    reason: `Reserved ~${requested} tokens. ~${spent + requested} of ${limit} used in this ${policy.token_window_seconds}s window.`,
-    remaining: Math.max(0, limit - spent - requested),
-  };
 }
 
 /** Reconcile a reservation to the real sizes once the call has returned. */

@@ -1,7 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { authenticateRequest } from './auth.js';
-import { entityStore } from './db.js';
+import { entityStore, tokenLedger } from './db.js';
 import { invokeModel } from './model.js';
 
 const functionNames = new Set([
@@ -42,7 +42,7 @@ function createInvokeLLMWrapper() {
 }
 
 export function createAppClientFromRequest(request) {
-  const serviceRole = { entities, integrations: { Core: { InvokeLLM: createInvokeLLMWrapper() } } };
+  const serviceRole = { entities, tokenLedger, integrations: { Core: { InvokeLLM: createInvokeLLMWrapper() } } };
   return {
     auth: { me: () => authenticateRequest(request) },
     asServiceRole: serviceRole,

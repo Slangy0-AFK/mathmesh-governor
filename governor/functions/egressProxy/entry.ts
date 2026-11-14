@@ -1,7 +1,7 @@
 import { createAppClientFromRequest } from '../../../server/runtime.js';
 import { admitRequest } from '../../shared/admission.ts';
 import { appendAudit } from '../../shared/auditChain.ts';
-import { checkEgressPermission, parseEgressTarget } from '../../shared/egressPolicy.ts';
+import { checkEgressPermission, parseEgressTarget, requestEgressTarget, resolveEgressTarget } from '../../shared/egressPolicy.ts';
 import { reportFunctionError } from '../../shared/observability.ts';
 
 /**
@@ -64,14 +64,20 @@ export default async function (req: Request): Promise<Response> {
     const permission = checkEgressPermission(target, entry);
     if (!permission.allowed) return await blocked(permission.reason, target.host);
 
-    const upstream = await fetch(target.url, {
-      method,
-      redirect: 'manual',
-      headers: { 'Accept': 'application/json, text/plain;q=0.9, */*;q=0.5' },
-      body: method === 'GET' || method === 'HEAD' ? undefined : (typeof body.body === 'string' ? body.body : undefined),
-    });
+    let address;
+    try {
+      address = await resolveEgressTarget(target.host);
+    } catch (error) {
+      await reportFunctionError('egressProxy DNS resolution', error);
+      return await blocked('DNS resolution failed.', target.host);
+    }
+    if (!address) return await blocked('DNS resolved to a non-public address or no addresses.', target.host);
 
-    const raw = await upstream.text();
+    const upstream = await requestEgressTarget(
+      target, address,
+      method === 'GET' || method === 'HEAD' ? undefined : (typeof body.body === 'string' ? body.body : undefined),
+    );
+    const { raw } = upstream;
     const truncated = raw.length > 20000;
 
     await svc.entities.EgressAllowlist.update(entry.id, { request_count: (entry.request_count || 0) + 1 });

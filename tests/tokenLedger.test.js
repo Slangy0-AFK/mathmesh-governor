@@ -12,19 +12,36 @@ import {
 function createService(spendRows = []) {
   const rows = [...spendRows];
   let nextId = rows.length + 1;
+  let pending = Promise.resolve();
+  const spend = (agentId, windowSeconds) => rows
+    .filter((row) => row.agent_id === agentId && row.phase !== 'refunded' &&
+      row.created_date >= new Date(Date.now() - windowSeconds * 1000).toISOString())
+    .reduce((sum, row) => sum + (row.tokens_total || 0), 0);
+  const create = async (fields) => {
+    const row = { id: `spend-${nextId++}`, created_date: new Date().toISOString(), ...fields };
+    rows.push(row);
+    return row;
+  };
 
   return {
     rows,
+    tokenLedger: {
+      windowSpend: async (agentId, windowSeconds) => spend(agentId, windowSeconds),
+      withReservationLock: async (agentId, callback) => {
+        const run = pending.then(() => callback({
+          windowSpend: async (windowSeconds) => spend(agentId, windowSeconds),
+          create,
+        }));
+        pending = run.then(() => undefined, () => undefined);
+        return await run;
+      },
+    },
     entities: {
       TokenSpend: {
         filter: async (criteria) => rows.filter((row) =>
           Object.entries(criteria).every(([key, value]) => row[key] === value)
         ),
-        create: async (fields) => {
-          const row = { id: `spend-${nextId++}`, created_date: new Date().toISOString(), ...fields };
-          rows.push(row);
-          return row;
-        },
+        create,
         update: async (id, fields) => {
           const row = rows.find((entry) => entry.id === id);
           if (!row) throw new Error(`Unknown token spend row: ${id}`);
@@ -50,6 +67,17 @@ test('estimates tokens by rounding text length up in groups of four', () => {
   assert.equal(estimateTokens(''), 0);
   assert.equal(estimateTokens('abcd'), 1);
   assert.equal(estimateTokens('abcde'), 2);
+});
+
+test('concurrent reservations cannot collectively exceed the window budget', async () => {
+  const service = createService();
+  const results = await Promise.all(Array.from({ length: 20 }, () =>
+    reserveTokens(service, makePolicy({ max_tokens_per_window: 514 }), {
+      agentId: 'agent-a', action: 'Fetch_Database_Record', promptText: 'abcd',
+    })
+  ));
+  assert.equal(results.filter((result) => result.allowed).length, 2);
+  assert.equal(await windowSpend(service, 'agent-a', 3600), 514);
 });
 
 test('reserves an estimated amount before a model call', async () => {

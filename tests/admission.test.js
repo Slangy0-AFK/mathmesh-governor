@@ -66,7 +66,15 @@ function createService({ policy = {}, agents = [], tickets = [], spends = [], au
     },
   }]));
 
-  return { entities, tables };
+  return {
+    entities, tables,
+    tokenLedger: {
+      windowSpend: async (agentId, windowSeconds) => tables.TokenSpend
+        .filter((row) => row.agent_id === agentId && row.phase !== 'refunded' &&
+          row.created_date >= new Date(Date.now() - windowSeconds * 1000).toISOString())
+        .reduce((sum, row) => sum + (row.tokens_total || 0), 0),
+    },
+  };
 }
 
 function agent(overrides = {}) {

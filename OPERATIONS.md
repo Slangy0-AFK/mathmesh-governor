@@ -71,9 +71,16 @@ review. The generic PostgreSQL table does not apply row-level security.
 - Keep PostgreSQL private, require TLS for remote database connections, and
   terminate public TLS at a trusted reverse proxy.
 - Enforcement fails closed when admission is unavailable. The egress proxy
-  only covers traffic that passes through it; it does not sandbox agents.
+  only covers traffic that passes through it; it does not sandbox agents. It
+  requires every DNS answer to be public and pins the connection to a checked
+  address. DNS failures and mixed public/private answers are blocked.
 - Token limits are estimated (chars/4), not a provider bill. Configure provider
-  billing alerts and spend caps separately.
+  billing alerts and spend caps separately. PostgreSQL serializes concurrent
+  reservations for each agent across application instances; actual usage may
+  still exceed an estimate when a model call is reconciled.
+- CI exercises concurrent reservations against PostgreSQL. To run that test
+  locally, set `TOKEN_LEDGER_TEST_DATABASE_URL` to a disposable test database
+  before running `npm run test:unit`; it creates application tables there.
 
 ## Monitoring for failures
 
